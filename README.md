@@ -1,1 +1,1 @@
-# GymBuddy
+# GymMate
