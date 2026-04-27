@@ -1,0 +1,433 @@
+# GymMate — Full Project Handover for Claude Code
+
+You are taking over the full development of GymMate from scratch.
+I am the founder. I do not write code. Your job is to build everything.
+Read this entire document before writing a single line of code.
+
+---
+
+## WHAT IS GYMMATE
+
+GymMate is a mobile app (iOS + Android) that solves two problems gym-goers face every day:
+
+1. People feel too shy or hesitant to approach someone they like at the gym.
+2. Most gym-goers have no idea how to train or what to eat.
+
+GymMate is the solution — a gym-focused social and utility app that combines a
+Hinge-style matching system with a gym knowledge platform, trainer marketplace,
+nutrition hub, and exercise library.
+
+---
+
+## THE 5 MODULES (full product vision)
+
+### Module 1 — Gym Partner Match (CORE)
+- Swipe-based matching system like Hinge, but filtered by gym location
+- Users see profiles of other gym-goers within a set radius (5km / 10km / 25km / 50km)
+- Swipe right to like, swipe left to pass
+- When two users both like each other → mutual match → chat unlocks
+- Real-time chat with typing indicators and read receipts
+- Report and block system for safety
+
+### Module 2 — Gym Help Board
+- Community Q&A section for gym questions (form, technique, programming)
+- Any user can post a question
+- Others answer — upvote system surfaces the best answers
+- Think Reddit for gym questions but inside the app
+
+### Module 3 — Trainer Marketplace
+- Certified personal trainers create profiles
+- They list: 1-on-1 training sessions, online programs, group classes
+- Discovery is radius-based (trainers near the user's gym)
+- Users can book sessions and pay inside the app (Stripe)
+- Trainers receive payouts via Stripe Connect (15% platform fee)
+
+### Module 4 — Nutrition Hub
+- Registered dietitians and nutritionists post meal plans
+- Users can purchase and follow meal plans
+- Built-in daily food logger: track protein, carbs, fats, calories
+- Macro goals set by user or recommended by dietitian
+
+### Module 5 — Exercise Library
+- Full exercise database organised by: push/pull/legs split, muscle group, difficulty, equipment
+- Video demonstrations + step-by-step instructions for each exercise
+- Users can build and save custom workout plans
+- Workout logger: log sets, reps, weight — tracks personal records
+- No social interaction required — works fully solo
+
+---
+
+## USER ROLES
+
+There are 4 roles in the system:
+
+1. user — default role. Can match, chat, browse everything, log workouts, track macros.
+2. trainer — verified role. Can list training sessions and programs. Has a trainer profile.
+3. dietitian — verified role. Can post meal plans. Has a dietitian profile.
+4. admin — internal role. Can moderate reports, verify trainers/dietitians, manage content.
+
+---
+
+## APP FLOW
+
+Open app
+→ Splash screen
+→ Sign up / Log in (email+password, Google, Apple)
+→ Onboarding (name, age, gym location, goals, fitness level, photos)
+→ Home — 5-tab bottom navigation:
+   Tab 1: Discover (swipe cards)
+   Tab 2: Matches / Chat
+   Tab 3: Help Board
+   Tab 4: Trainers + Nutrition
+   Tab 5: My Profile
+
+---
+
+## FULL TECH STACK
+
+### Mobile
+- React Native + Expo (single codebase for iOS + Android)
+- Expo Router v3 (file-based navigation)
+- Zustand (client state management)
+- React Query (server state, caching, background refetch)
+- NativeWind (Tailwind CSS for React Native)
+- React Native Paper (UI component library)
+- Reanimated 3 + Gesture Handler (swipe animations)
+- Expo Image Picker (photo uploads)
+- Expo Location (GPS)
+- Expo Notifications (push notification handling)
+- Expo Secure Store (token storage)
+- React Hook Form + Zod (form validation)
+- Socket.io-client (real-time chat)
+- Axios (HTTP client with interceptors)
+
+### Backend
+- Node.js + Express (REST API)
+- TypeScript throughout — no implicit any
+- Modular monolith structure (one folder per domain)
+- Prisma ORM (type-safe DB queries + migrations)
+- PostgreSQL 16 + PostGIS 3.4 (location queries)
+- Redis 7 (caching, rate limiting, session)
+- Socket.io (real-time chat server)
+- AWS S3 / MinIO (photo storage)
+- CloudFront CDN (media delivery)
+- Firebase Admin SDK (Android push notifications)
+- node-apn (iOS push notifications)
+- Twilio (SMS OTP — Phase 1 behind feature flag)
+- Stripe (payments — Phase 3)
+- BullMQ (job queues — Phase 3)
+- Pino (structured logging)
+- Sentry (error monitoring)
+- Zod (request validation)
+- bcrypt (password hashing, min 12 rounds)
+- jsonwebtoken (JWT auth)
+- google-auth-library (Google OAuth)
+
+### DevOps
+- Docker + docker-compose (local dev: postgres, redis, minio)
+- GitHub Actions (CI/CD)
+- Render.com or AWS EC2 (staging server)
+- Dockerfile (multi-stage, non-root user)
+
+---
+
+## MONOREPO FOLDER STRUCTURE
+
+GymMate/
+├── .github/
+│   └── workflows/
+│       ├── ci.yml                   # lint + test on PR
+│       └── deploy-staging.yml       # auto-deploy on merge to dev
+├── docker/
+│   ├── docker-compose.yml           # postgres+postgis, redis, minio
+│   ├── postgres/
+│   │   └── init.sql                 # extensions: uuid-ossp, postgis, pgcrypto
+│   └── minio/
+│       └── README.md
+├── packages/
+│   └── shared/                      # shared Zod schemas + TS types
+│       ├── package.json
+│       ├── tsconfig.json
+│       └── src/
+│           ├── schemas/             # auth.ts, user.ts, swipe.ts, match.ts, message.ts
+│           ├── types/               # index.ts
+│           └── constants/           # roles.ts, fitnessLevels.ts, goals.ts
+├── server/
+│   ├── package.json
+│   ├── tsconfig.json
+│   ├── Dockerfile
+│   ├── .env.example
+│   ├── prisma/
+│   │   ├── schema.prisma
+│   │   ├── migrations/
+│   │   │   └── 001_initial_schema.sql
+│   │   └── seed.ts
+│   └── src/
+│       ├── index.ts
+│       ├── app.ts
+│       ├── config/
+│       │   ├── env.ts               # zod-validated env loader
+│       │   ├── db.ts                # prisma singleton
+│       │   ├── redis.ts             # ioredis singleton
+│       │   ├── s3.ts                # s3/minio client
+│       │   └── featureFlags.ts
+│       ├── modules/
+│       │   ├── auth/                # register, login, refresh, logout, google oauth
+│       │   ├── users/               # profile CRUD, photo upload
+│       │   ├── photos/              # presigned S3 uploads
+│       │   ├── discovery/           # PostGIS ST_DWithin feed + Redis cache
+│       │   ├── swipes/              # swipe recording + mutual match detection
+│       │   ├── matches/             # match listing
+│       │   ├── messages/            # message history + REST fallback send
+│       │   ├── moderation/          # block + report
+│       │   └── notifications/       # FCM (Android) + APNs (iOS) + device tokens
+│       ├── realtime/
+│       │   ├── socket.ts            # Socket.io server bootstrap
+│       │   ├── chat.gateway.ts      # all socket event handlers
+│       │   └── auth.middleware.ts   # JWT verify on socket handshake
+│       ├── middleware/
+│       │   ├── authGuard.ts
+│       │   ├── roleGuard.ts
+│       │   ├── errorHandler.ts
+│       │   ├── requestLogger.ts
+│       │   └── rateLimit.ts
+│       └── lib/
+│           ├── logger.ts            # pino
+│           ├── errors.ts            # AppError + subclasses
+│           └── sentry.ts
+└── mobile/
+    ├── package.json
+    ├── tsconfig.json
+    ├── app.json
+    ├── app/
+    │   ├── _layout.tsx              # root providers
+    │   ├── (auth)/                  # welcome, sign-up, log-in, otp
+    │   ├── (onboarding)/            # basics, location, photos, goals, fitness-level
+    │   └── (app)/
+    │       ├── _layout.tsx          # bottom tabs
+    │       ├── discover/            # swipe stack + filters
+    │       ├── matches/             # match list + chat thread
+    │       ├── profile/             # own profile + edit + other users
+    │       └── match-celebration.tsx
+    └── src/
+        ├── api/                     # axios client + all API hooks
+        ├── stores/                  # authStore, onboardingStore, filtersStore
+        ├── components/              # SwipeCard, SwipeStack, MessageBubble, ChatInput
+        ├── hooks/                   # useAuth, useSocket, useNotifications, useLocation
+        └── lib/                    # socket singleton, secureStorage, theme, sentry
+
+---
+
+## DATABASE SCHEMA (PostgreSQL + PostGIS)
+
+8 tables for Phase 1:
+
+users — id, email, phone, password_hash, role, display_name, bio, date_of_birth,
+        avatar_url, photos (TEXT[]), gym_name, gym_location (GEOGRAPHY POINT 4326),
+        goals (TEXT[]), fitness_level, is_verified, is_active, last_seen_at, created_at, updated_at
+
+refresh_tokens — id, user_id, token_hash, expires_at, created_at
+
+swipes — id, swiper_id, swiped_id, direction (like/pass), created_at
+         UNIQUE(swiper_id, swiped_id)
+
+matches — id, user_a_id, user_b_id, is_active, matched_at
+          UNIQUE(user_a_id, user_b_id)
+
+messages — id, match_id, sender_id, content, media_url, message_type (text/image/gif),
+           read_at, created_at
+
+blocks — id, blocker_id, blocked_id, created_at
+         UNIQUE(blocker_id, blocked_id)
+
+reports — id, reporter_id, reported_id, reason, details, status (pending/reviewed/actioned), created_at
+
+device_tokens — id, user_id, token, platform (ios/android), created_at
+                UNIQUE(user_id, token)
+
+Critical indexes:
+- GIST index on users.gym_location (for ST_DWithin radius queries)
+- Composite index on swipes(swiper_id, swiped_id)
+- Index on messages(match_id, created_at DESC)
+
+PostGIS note: gym_location is Unsupported("geography(Point, 4326)") in Prisma schema.
+All location reads/writes use prisma.$queryRaw / prisma.$executeRaw with ST_MakePoint(lng, lat)::geography.
+ST_DWithin is used for discovery (NOT ST_Distance) — ST_DWithin uses the GiST index.
+Coordinate order is always (longitude, latitude) in ST_MakePoint.
+
+---
+
+## API CONTRACT
+
+Base URL: /api/v1
+All responses: { success: true, data: {...} } or { success: false, error: { code, message } }
+Protected routes require: Authorization: Bearer 
+
+AUTH:
+POST /auth/register         — { email, password, display_name }
+POST /auth/login            — { email, password }
+POST /auth/refresh          — { refresh_token }
+POST /auth/logout           — protected
+POST /auth/oauth/google     — { id_token }
+POST /auth/oauth/apple      — { id_token } — behind FEATURE_APPLE_AUTH flag
+POST /auth/otp/send         — { phone } — behind FEATURE_OTP flag
+POST /auth/otp/verify       — { phone, code } — behind FEATURE_OTP flag
+
+USERS:
+GET    /users/me            — own profile
+PUT    /users/me            — update profile
+POST   /users/me/photos     — multipart upload (max 6 photos, 5MB each, jpg/png)
+DELETE /users/me/photos/:index
+GET    /users/:id           — public profile
+
+DISCOVERY:
+GET /discover               — query: radius_km, limit, fitness_levels
+
+SWIPES:
+POST /swipes                — { swiped_id, direction: like|pass }
+                              returns { matched: bool, match_id?: string }
+
+MATCHES:
+GET /matches                — all active matches + last message preview
+GET /matches/:id            — single match
+
+MESSAGES:
+GET  /matches/:id/messages  — cursor-based pagination
+POST /matches/:id/messages  — REST fallback send
+
+SAFETY:
+POST /users/:id/block
+POST /users/:id/report      — { reason, details? }
+
+DEVICE TOKENS:
+POST   /device-tokens       — { token, platform }
+DELETE /device-tokens/:token
+
+RATE LIMITS:
+- Auth endpoints: 10 req / 15 min / IP
+- Swipe endpoint: 100 req / hour / user
+- All others: 300 req / 15 min / user
+
+---
+
+## SOCKET.IO EVENTS
+
+Client → Server:
+join_chat       { match_id }
+send_message    { match_id, content, message_type }
+typing_start    { match_id }
+typing_stop     { match_id }
+mark_read       { match_id, message_id }
+
+Server → Client:
+new_message           { message: { id, match_id, sender_id, content, message_type, created_at } }
+user_typing           { match_id, user_id }
+user_stopped_typing   { match_id, user_id }
+message_read          { match_id, message_id, read_at }
+new_match             { match: { id, user: { id, display_name, avatar_url } } }
+
+Socket auth: JWT passed in socket.handshake.auth.token — verified on handshake.
+Each match has its own socket room: match:{matchId}
+
+---
+
+## ENVIRONMENT VARIABLES
+
+Server needs these (see .env.example):
+DATABASE_URL, REDIS_URL,
+JWT_ACCESS_SECRET, JWT_REFRESH_SECRET, JWT_ACCESS_TTL (15m), JWT_REFRESH_TTL (30d),
+GOOGLE_CLIENT_ID,
+S3_ENDPOINT, S3_REGION, S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY, S3_FORCE_PATH_STYLE,
+FIREBASE_SERVICE_ACCOUNT_JSON,
+APNS_KEY, APNS_KEY_ID, APNS_TEAM_ID,
+TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER,
+SENTRY_DSN, PORT (4000), NODE_ENV,
+FEATURE_APPLE_AUTH (false), FEATURE_OTP (false)
+
+Mobile needs:
+EXPO_PUBLIC_API_URL, EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID, EXPO_PUBLIC_SENTRY_DSN
+
+---
+
+## PHASE 1 SCOPE (build this first — Weeks 1-6)
+
+Phase 1 = the foundation. Everything else builds on top of this.
+
+✅ Auth system (email/password + Google OAuth)
+✅ User profiles with photo upload to S3/MinIO
+✅ Location capture and gym pin (PostGIS)
+✅ Discovery feed with radius filtering (ST_DWithin)
+✅ Swipe system with mutual match detection
+✅ Match celebration screen
+✅ Real-time chat (Socket.io)
+✅ Push notifications (Firebase + APNs)
+✅ Report and block
+✅ Docker local dev environment
+✅ GitHub Actions CI/CD
+✅ Sentry error monitoring
+
+NOT in Phase 1 (do not build yet):
+❌ Help Board (Phase 2)
+❌ Trainer Marketplace (Phase 2-3)
+❌ Nutrition Hub (Phase 3)
+❌ Exercise Library (Phase 2)
+❌ Stripe payments (Phase 3)
+❌ Apple OAuth (behind feature flag, Phase 2)
+❌ SMS OTP (behind feature flag, Phase 2)
+
+---
+
+## MONETISATION (for context, not Phase 1)
+
+- Free tier: limited daily swipes, browse exercises, read Q&A
+- GymMate Pro: unlimited swipes, see who liked you, advanced filters, macro tracker (~$9.99/mo)
+- Marketplace fee: 15% cut on trainer bookings and nutrition plan purchases via Stripe Connect
+- Trainer boost: paid placement at top of radius search results
+
+---
+
+## WORKING RULES
+
+1. Write every file in full. No placeholders. No "// rest of file here". Complete files only.
+2. TypeScript throughout. Strict mode. No implicit any.
+3. Every API endpoint returns { success, data } or { success, error: { code, message } }.
+4. Never hardcode secrets. All config comes from env.ts (zod-validated on startup).
+5. All inputs validated with Zod server-side before any business logic runs.
+6. PostGIS: always use ST_DWithin (not ST_Distance) for radius filtering. Always ST_MakePoint(lng, lat) — longitude first.
+7. Prisma handles 95% of queries. Only use $queryRaw/$executeRaw for PostGIS operations.
+8. Swipe discovery excludes: own profile, already-swiped users, blocked users (either direction).
+9. Match user_a_id is always the smaller UUID (consistent ordering prevents duplicate matches).
+10. Chat messages are cursor-paginated (not offset). FlatList is inverted on mobile.
+11. Refresh tokens are hashed with bcrypt before storing. Never store raw tokens.
+12. Socket rooms are named match:{matchId}. Users join on open chat, leave on close.
+13. Push notifications only sent when recipient is offline/backgrounded.
+14. Rate limits: auth 10/15min/IP, swipes 100/hr/user, everything else 300/15min/user.
+15. When you finish a module, tell me: what was built, what to test, and what comes next.
+
+---
+
+## START INSTRUCTIONS
+
+Build Phase 1 in this exact order:
+
+1. Scaffold the full monorepo folder structure (all folders and empty files)
+2. docker/docker-compose.yml + docker/postgres/init.sql
+3. server/prisma/schema.prisma + server/prisma/migrations/001_initial_schema.sql + server/prisma/seed.ts
+4. server/package.json + server/tsconfig.json + server/.env.example
+5. server/src/config/* (env.ts, db.ts, redis.ts, s3.ts, featureFlags.ts)
+6. server/src/lib/* (errors.ts, logger.ts, sentry.ts)
+7. server/src/middleware/* (authGuard.ts, roleGuard.ts, errorHandler.ts, requestLogger.ts, rateLimit.ts)
+8. server/src/modules/auth/* (all files)
+9. server/src/modules/users/* + photos/* (all files)
+10. server/src/modules/discovery/* (all files)
+11. server/src/modules/swipes/* + matches/* + messages/* (all files)
+12. server/src/modules/moderation/* + notifications/* (all files)
+13. server/src/realtime/* (socket.ts, chat.gateway.ts, auth.middleware.ts)
+14. server/src/app.ts + server/src/index.ts
+15. mobile/ — full React Native app (all screens, components, stores, hooks, API layer)
+16. .github/workflows/ci.yml + deploy-staging.yml
+17. server/Dockerfile
+18. README.md
+
+Start with step 1. Create every file and folder. Then move to step 2.
+Do not skip steps. Do not summarise. Write every file in full.
