@@ -1,0 +1,178 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  user
+  trainer
+  dietitian
+  admin
+}
+
+enum FitnessLevel {
+  beginner
+  intermediate
+  advanced
+}
+
+enum SwipeDirection {
+  like
+  pass
+}
+
+enum MessageType {
+  text
+  image
+  gif
+}
+
+enum ReportStatus {
+  pending
+  reviewed
+  actioned
+}
+
+enum Platform {
+  ios
+  android
+}
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  phone        String?       @unique
+  passwordHash String?       @map("password_hash")
+  role         Role          @default(user)
+  displayName  String        @map("display_name")
+  bio          String?
+  dateOfBirth  DateTime?     @map("date_of_birth")
+  avatarUrl    String?       @map("avatar_url")
+  photos       String[]
+  gymName      String?       @map("gym_name")
+  goals        String[]
+  fitnessLevel FitnessLevel? @map("fitness_level")
+  isVerified   Boolean       @default(false) @map("is_verified")
+  isActive     Boolean       @default(true) @map("is_active")
+  lastSeenAt   DateTime?     @map("last_seen_at")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  refreshTokens   RefreshToken[]
+  swipesGiven     Swipe[]        @relation("swiper")
+  swipesReceived  Swipe[]        @relation("swiped")
+  matchesAsA      Match[]        @relation("userA")
+  matchesAsB      Match[]        @relation("userB")
+  messagesSent    Message[]
+  blocksGiven     Block[]        @relation("blocker")
+  blocksReceived  Block[]        @relation("blocked")
+  reportsGiven    Report[]       @relation("reporter")
+  reportsReceived Report[]       @relation("reported")
+  deviceTokens    DeviceToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  tokenHash String   @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model Swipe {
+  id        String         @id @default(uuid())
+  swiperId  String         @map("swiper_id")
+  swipedId  String         @map("swiped_id")
+  direction SwipeDirection
+  createdAt DateTime       @default(now()) @map("created_at")
+
+  swiper User @relation("swiper", fields: [swiperId], references: [id], onDelete: Cascade)
+  swiped User @relation("swiped", fields: [swipedId], references: [id], onDelete: Cascade)
+
+  @@unique([swiperId, swipedId])
+  @@index([swiperId, swipedId])
+  @@map("swipes")
+}
+
+model Match {
+  id        String   @id @default(uuid())
+  userAId   String   @map("user_a_id")
+  userBId   String   @map("user_b_id")
+  isActive  Boolean  @default(true) @map("is_active")
+  matchedAt DateTime @default(now()) @map("matched_at")
+
+  userA    User      @relation("userA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB    User      @relation("userB", fields: [userBId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@unique([userAId, userBId])
+  @@map("matches")
+}
+
+model Message {
+  id          String      @id @default(uuid())
+  matchId     String      @map("match_id")
+  senderId    String      @map("sender_id")
+  content     String?
+  mediaUrl    String?     @map("media_url")
+  messageType MessageType @default(text) @map("message_type")
+  readAt      DateTime?   @map("read_at")
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  match  Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  sender User  @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([matchId, createdAt(sort: Desc)])
+  @@map("messages")
+}
+
+model Block {
+  id        String   @id @default(uuid())
+  blockerId String   @map("blocker_id")
+  blockedId String   @map("blocked_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  blocker User @relation("blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@map("blocks")
+}
+
+model Report {
+  id         String       @id @default(uuid())
+  reporterId String       @map("reporter_id")
+  reportedId String       @map("reported_id")
+  reason     String
+  details    String?
+  status     ReportStatus @default(pending)
+  createdAt  DateTime     @default(now()) @map("created_at")
+
+  reporter User @relation("reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reported User @relation("reported", fields: [reportedId], references: [id], onDelete: Cascade)
+
+  @@map("reports")
+}
+
+model DeviceToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  token     String
+  platform  Platform
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, token])
+  @@map("device_tokens")
+}
