@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/auth";
 import { issueTokenPair } from "@/lib/jwt";
 import { parseJson, registerSchema } from "@/lib/validation";
+import { setRefreshCookie } from "@/lib/cookies";
 
 export async function POST(req: NextRequest) {
   const parsed = await parseJson(req, registerSchema);
@@ -23,11 +24,13 @@ export async function POST(req: NextRequest) {
   });
 
   const tokens = await issueTokenPair(user.id, user.email);
-  return NextResponse.json(
+  const res = NextResponse.json(
     {
       user: { id: user.id, email: user.email, name: user.name },
       ...tokens,
     },
     { status: 201 }
   );
+  setRefreshCookie(res, tokens.refreshToken);
+  return res;
 }
