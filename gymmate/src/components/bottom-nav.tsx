@@ -2,15 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Heart, HelpCircle, Users, Apple, Dumbbell, LogOut } from "lucide-react";
+import { Heart, HelpCircle, Users, Apple, Dumbbell, User, LogOut } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 const tabs = [
   { href: "/", label: "Match", icon: Heart },
-  { href: "/help-board", label: "Help Board", icon: HelpCircle },
+  { href: "/help-board", label: "Help", icon: HelpCircle },
   { href: "/trainers", label: "Trainers", icon: Users },
   { href: "/nutrition", label: "Nutrition", icon: Apple },
   { href: "/exercise", label: "Exercise", icon: Dumbbell },
+  { href: "/profile", label: "Profile", icon: User },
 ];
 
 const HIDDEN_ON = ["/login", "/register"];

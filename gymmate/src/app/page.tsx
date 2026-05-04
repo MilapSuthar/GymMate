@@ -1,5 +1,6 @@
 import { X, Heart, MapPin, Dumbbell } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import ProfileCompletionBanner from "@/components/profile-completion-banner";
 
 const profile = {
   name: "Sarah K.",
@@ -16,6 +17,8 @@ export default function MatchPage() {
       <div className="w-full max-w-sm">
         <h1 className="text-2xl font-bold mb-1">Match</h1>
         <p className="text-muted-foreground text-sm mb-4">Gym-goers near you</p>
+
+        <ProfileCompletionBanner />
 
         <div className={`relative w-full rounded-3xl overflow-hidden bg-gradient-to-b ${profile.bg} aspect-[3/4]`}>
           <div className="absolute inset-0 flex items-center justify-center">

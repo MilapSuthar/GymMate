@@ -19,15 +19,20 @@ model User {
   passwordHash String?
   provider     String   @default("credentials") // credentials | google
   googleId     String?  @unique
-  name         String
-  age          Int?
-  bio          String?
-  photoUrl     String?
-  gymId        String?
-  gym          Gym?     @relation(fields: [gymId], references: [id])
-  goals        String?  // comma-separated for SQLite simplicity
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  name            String
+  displayName     String?
+  age             Int?
+  bio             String?
+  photoUrl        String?
+  gymId           String?
+  gym             Gym?     @relation(fields: [gymId], references: [id])
+  gymName         String?  // free-text gym (real Gym relation comes later)
+  goals           String?  // legacy comma-separated (kept for backward compat)
+  fitnessGoals    String?  // comma-separated: strength,cardio,weight-loss,muscle-gain,flexibility
+  experienceLevel String?  // beginner | intermediate | advanced
+  photos          UserPhoto[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   // Match relations
   swipesGiven    Swipe[]   @relation("Swiper")
@@ -242,4 +247,18 @@ model WorkoutSet {
   reps         Int
   weightKg     Float
   setNumber    Int
+}
+
+// =====================
+// USER PHOTOS
+// =====================
+model UserPhoto {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  url       String
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
