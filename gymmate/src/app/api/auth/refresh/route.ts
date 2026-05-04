@@ -5,12 +5,24 @@ import {
   revokeRefreshToken,
   issueTokenPair,
 } from "@/lib/jwt";
-import { parseJson, refreshSchema } from "@/lib/validation";
+import { REFRESH_COOKIE, setRefreshCookie } from "@/lib/cookies";
 
 export async function POST(req: NextRequest) {
-  const parsed = await parseJson(req, refreshSchema);
-  if (parsed.error) return parsed.error;
-  const { refreshToken } = parsed.data;
+  // Read from httpOnly cookie first (browser flow), fall back to JSON body (CLI / mobile clients).
+  const cookieToken = req.cookies.get(REFRESH_COOKIE)?.value;
+  let refreshToken = cookieToken;
+  if (!refreshToken) {
+    try {
+      const body = await req.json();
+      if (body && typeof body.refreshToken === "string") refreshToken = body.refreshToken;
+    } catch {
+      // no body — fine
+    }
+  }
+
+  if (!refreshToken) {
+    return NextResponse.json({ error: "Missing refresh token" }, { status: 401 });
+  }
 
   const userId = await consumeRefreshToken(refreshToken);
   if (!userId) {
@@ -26,5 +38,10 @@ export async function POST(req: NextRequest) {
   // Rotate: revoke old refresh token and issue a fresh pair (defense in depth)
   await revokeRefreshToken(refreshToken);
   const tokens = await issueTokenPair(user.id, user.email);
-  return NextResponse.json(tokens);
+  const res = NextResponse.json({
+    user: { id: user.id, email: user.email, name: user.name },
+    ...tokens,
+  });
+  setRefreshCookie(res, tokens.refreshToken);
+  return res;
 }

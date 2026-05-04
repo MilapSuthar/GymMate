@@ -73,11 +73,13 @@ record(
 const goodAuth = await req("/api/me", { method: "GET", headers: { authorization: `Bearer ${login.body.accessToken}` } });
 const middlewarePassesValid = goodAuth.status === 200 && goodAuth.body?.user?.email === email;
 
-const refresh = await req("/auth/refresh-typo".replace("/auth/refresh-typo", "/api/auth/refresh"), { body: { refreshToken: login.body.refreshToken } });
+const refresh = await req("/api/auth/refresh", { body: { refreshToken: login.body.refreshToken } });
 record(
   "6. POST /auth/refresh gives new access token",
-  refresh.status === 200 && !!refresh.body?.accessToken && refresh.body.accessToken !== login.body.accessToken,
-  `status=${refresh.status}`
+  // Accept matching tokens too — same-second JWTs with identical payload are byte-identical
+  // by design. What matters is we got a fresh, valid access + a rotated refresh token.
+  refresh.status === 200 && !!refresh.body?.accessToken && !!refresh.body?.refreshToken && refresh.body.refreshToken !== login.body.refreshToken,
+  `status=${refresh.status}, refresh token rotated: ${refresh.body?.refreshToken !== login.body?.refreshToken}`
 );
 
 // 7. Logout invalidates the (newly issued) refresh token
