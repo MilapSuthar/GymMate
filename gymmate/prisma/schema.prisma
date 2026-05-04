@@ -1,0 +1,243 @@
+// GymMate database schema
+// Covers all 5 sections: Match, Help Board, Trainers, Nutrition, Exercise Library
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// =====================
+// USERS
+// =====================
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  age          Int?
+  bio          String?
+  photoUrl     String?
+  gymId        String?
+  gym          Gym?     @relation(fields: [gymId], references: [id])
+  goals        String?  // comma-separated for SQLite simplicity
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Match relations
+  swipesGiven    Swipe[]   @relation("Swiper")
+  swipesReceived Swipe[]   @relation("Swiped")
+  matchesA       Match[]   @relation("UserA")
+  matchesB       Match[]   @relation("UserB")
+  messagesSent   Message[] @relation("MessageSender")
+
+  // Help Board
+  questions Question[]
+  answers   Answer[]
+
+  // Trainer side
+  trainerProfile TrainerProfile?
+  bookingsAsClient Booking[] @relation("ClientBookings")
+
+  // Nutrition
+  mealPlanPurchases MealPlanPurchase[]
+  nutritionLogs     NutritionLog[]
+  dietitianProfile  DietitianProfile?
+
+  // Exercise
+  workoutLogs WorkoutLog[]
+}
+
+// =====================
+// GYMS
+// =====================
+model Gym {
+  id        String   @id @default(cuid())
+  name      String
+  address   String
+  latitude  Float?
+  longitude Float?
+  users     User[]
+  trainers  TrainerProfile[]
+}
+
+// =====================
+// MATCH
+// =====================
+model Swipe {
+  id         String   @id @default(cuid())
+  swiperId   String
+  swiper     User     @relation("Swiper", fields: [swiperId], references: [id])
+  swipedId   String
+  swiped     User     @relation("Swiped", fields: [swipedId], references: [id])
+  liked      Boolean
+  createdAt  DateTime @default(now())
+
+  @@unique([swiperId, swipedId])
+}
+
+model Match {
+  id        String    @id @default(cuid())
+  userAId   String
+  userA     User      @relation("UserA", fields: [userAId], references: [id])
+  userBId   String
+  userB     User      @relation("UserB", fields: [userBId], references: [id])
+  createdAt DateTime  @default(now())
+  messages  Message[]
+
+  @@unique([userAId, userBId])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  matchId   String
+  match     Match    @relation(fields: [matchId], references: [id])
+  senderId  String
+  sender    User     @relation("MessageSender", fields: [senderId], references: [id])
+  content   String
+  createdAt DateTime @default(now())
+}
+
+// =====================
+// HELP BOARD
+// =====================
+model Question {
+  id        String   @id @default(cuid())
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  body      String
+  tags      String?  // comma-separated
+  likes     Int      @default(0)
+  answers   Answer[]
+  createdAt DateTime @default(now())
+}
+
+model Answer {
+  id         String   @id @default(cuid())
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id])
+  authorId   String
+  author     User     @relation(fields: [authorId], references: [id])
+  body       String
+  likes      Int      @default(0)
+  createdAt  DateTime @default(now())
+}
+
+// =====================
+// TRAINERS
+// =====================
+model TrainerProfile {
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id])
+  gymId       String?
+  gym         Gym?      @relation(fields: [gymId], references: [id])
+  specialty   String
+  bio         String?
+  pricePerSession Float
+  certifications  String?
+  verified    Boolean   @default(false)
+  rating      Float?
+  reviewCount Int       @default(0)
+  bookings    Booking[]
+  createdAt   DateTime  @default(now())
+}
+
+model Booking {
+  id         String         @id @default(cuid())
+  clientId   String
+  client     User           @relation("ClientBookings", fields: [clientId], references: [id])
+  trainerId  String
+  trainer    TrainerProfile @relation(fields: [trainerId], references: [id])
+  scheduledAt DateTime
+  status     String         @default("pending") // pending, confirmed, completed, cancelled
+  paidAmount Float
+  createdAt  DateTime       @default(now())
+}
+
+// =====================
+// NUTRITION
+// =====================
+model DietitianProfile {
+  id            String     @id @default(cuid())
+  userId        String     @unique
+  user          User       @relation(fields: [userId], references: [id])
+  registrationId String
+  bio           String?
+  verified      Boolean    @default(false)
+  mealPlans     MealPlan[]
+}
+
+model MealPlan {
+  id            String             @id @default(cuid())
+  dietitianId   String
+  dietitian     DietitianProfile   @relation(fields: [dietitianId], references: [id])
+  title         String
+  description   String?
+  caloriesPerDay Int
+  durationWeeks Int?
+  price         Float
+  tags          String?
+  purchases     MealPlanPurchase[]
+  createdAt     DateTime           @default(now())
+}
+
+model MealPlanPurchase {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  mealPlanId String
+  mealPlan   MealPlan @relation(fields: [mealPlanId], references: [id])
+  pricePaid  Float
+  createdAt  DateTime @default(now())
+}
+
+model NutritionLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  date      DateTime
+  calories  Int
+  protein   Float
+  carbs     Float
+  fats      Float
+  notes     String?
+  createdAt DateTime @default(now())
+}
+
+// =====================
+// EXERCISE LIBRARY
+// =====================
+model Exercise {
+  id          String       @id @default(cuid())
+  name        String
+  muscleGroup String       // chest, back, legs, etc.
+  category    String       // push, pull, legs, full_body
+  equipment   String?
+  description String?
+  videoUrl    String?
+  workoutSets WorkoutSet[]
+}
+
+model WorkoutLog {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id])
+  date      DateTime     @default(now())
+  notes     String?
+  sets      WorkoutSet[]
+}
+
+model WorkoutSet {
+  id           String     @id @default(cuid())
+  workoutLogId String
+  workoutLog   WorkoutLog @relation(fields: [workoutLogId], references: [id])
+  exerciseId   String
+  exercise     Exercise   @relation(fields: [exerciseId], references: [id])
+  reps         Int
+  weightKg     Float
+  setNumber    Int
+}
