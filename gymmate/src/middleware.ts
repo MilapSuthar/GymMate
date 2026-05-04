@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
  * via /api/auth/refresh on mount, and bouncing back to /login is a non-issue
  * because the refresh endpoint will reject an invalid cookie.
  */
-const PROTECTED_PATHS = ["/", "/match", "/help-board", "/trainers", "/nutrition", "/exercise"];
+const PROTECTED_PATHS = ["/", "/match", "/help-board", "/trainers", "/nutrition", "/exercise", "/profile"];
 const AUTH_PATHS = ["/login", "/register"];
 const REFRESH_COOKIE = "gm_refresh";
 
