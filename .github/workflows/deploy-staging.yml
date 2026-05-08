@@ -1,0 +1,21 @@
+name: Deploy Staging
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Deploy to staging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        working-directory: server
+        run: docker build -t gymmate-server:${{ github.sha }} .
+
+      - name: Deploy
+        run: |
+          echo "Add your deploy commands here (Render, EC2, etc.)"
+          echo "Image: gymmate-server:${{ github.sha }}"
