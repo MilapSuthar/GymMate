@@ -55,13 +55,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // If there's no cookie there's nothing to refresh — don't even try.
+      // (`document.cookie` won't show httpOnly cookies, but it's a useful
+      // negative signal: if it's empty there's definitely no session.)
+      const hasAnyCookie =
+        typeof document !== "undefined" && document.cookie.length > 0;
       try {
         const res = await fetch("/api/auth/refresh", {
           method: "POST",
           credentials: "include",
         });
         if (!res.ok) {
-          if (!cancelled) setLoading(false);
+          if (cancelled) return;
+          // If we had a cookie but refresh failed, the cookie was stale (e.g.
+          // dev Redis wipe). The endpoint just cleared it — bounce to login
+          // so the user isn't stuck on a protected page that won't load.
+          if (hasAnyCookie && res.status === 401) {
+            const path = window.location.pathname;
+            if (path !== "/login" && path !== "/register") {
+              router.replace(`/login?next=${encodeURIComponent(path)}`);
+            }
+          }
+          setLoading(false);
           return;
         }
         const data = await res.json();
@@ -77,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [applyToken]);
+  }, [applyToken, router]);
 
   const login = useCallback(
     async (email: string, password: string) => {
