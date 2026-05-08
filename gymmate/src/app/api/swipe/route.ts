@@ -1,0 +1,94 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { prisma } from "@/lib/db";
+import { withAuth } from "@/lib/auth";
+import { parseJson } from "@/lib/validation";
+
+const swipeSchema = z.object({
+  swipeeId: z.string().min(1),
+  direction: z.enum(["like", "pass"]),
+});
+
+/**
+ * POST /api/swipe — record a swipe and create a Match if mutual.
+ *
+ * Idempotent on (swiperId, swipeeId) via the unique constraint — replaying the
+ * same swipe overwrites `liked` rather than creating a duplicate row, which
+ * also means the user can change their mind from a "pass" to a "like".
+ *
+ * Returns { isMatch, match? } — match is included when mutual likes form one.
+ */
+export const POST = withAuth(async (req, payload) => {
+  const parsed = await parseJson(req, swipeSchema);
+  if (parsed.error) return parsed.error;
+  const { swipeeId, direction } = parsed.data;
+  const swiperId = payload.sub;
+
+  if (swipeeId === swiperId) {
+    return NextResponse.json(
+      { error: "Cannot swipe on yourself" },
+      { status: 400 }
+    );
+  }
+
+  const swipee = await prisma.user.findUnique({
+    where: { id: swipeeId },
+    select: { id: true },
+  });
+  if (!swipee) {
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
+  const liked = direction === "like";
+
+  // Upsert so a re-swipe is harmless (and changeable). The unique
+  // (swiperId, swipedId) index makes this O(1).
+  await prisma.swipe.upsert({
+    where: { swiperId_swipedId: { swiperId, swipedId: swipeeId } },
+    create: { swiperId, swipedId: swipeeId, liked },
+    update: { liked },
+  });
+
+  if (!liked) {
+    return NextResponse.json({ isMatch: false });
+  }
+
+  // Did the other side already like us? If so, mint a Match (or return
+  // the existing one if a previous race created it).
+  const reciprocal = await prisma.swipe.findUnique({
+    where: { swiperId_swipedId: { swiperId: swipeeId, swipedId: swiperId } },
+  });
+  if (!reciprocal || !reciprocal.liked) {
+    return NextResponse.json({ isMatch: false });
+  }
+
+  // Order the pair deterministically so (A,B) and (B,A) both hit the same row.
+  const [userAId, userBId] = [swiperId, swipeeId].sort();
+
+  const match = await prisma.match.upsert({
+    where: { userAId_userBId: { userAId, userBId } },
+    create: { userAId, userBId },
+    update: {},
+    include: {
+      userA: { select: { id: true, name: true, displayName: true, photoUrl: true } },
+      userB: { select: { id: true, name: true, displayName: true, photoUrl: true } },
+    },
+  });
+
+  // Surface "the other person" so the frontend can show the match modal
+  // without a follow-up fetch.
+  const other = match.userA.id === swiperId ? match.userB : match.userA;
+
+  return NextResponse.json({
+    isMatch: true,
+    match: {
+      id: match.id,
+      createdAt: match.createdAt,
+      otherUser: {
+        id: other.id,
+        name: other.displayName || other.name,
+        photoUrl: other.photoUrl,
+      },
+    },
+  });
+});

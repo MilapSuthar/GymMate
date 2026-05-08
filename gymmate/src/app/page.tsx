@@ -1,17 +1,124 @@
-import { X, Heart, MapPin, Dumbbell } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import ProfileCompletionBanner from "@/components/profile-completion-banner";
+"use client";
 
-const profile = {
-  name: "Sarah K.",
-  age: 24,
-  gym: "PureGym City Centre",
-  distance: "0.3 mi",
-  tags: ["Powerlifting", "5AM Club", "Meal Prep"],
-  bg: "from-violet-900 to-indigo-900",
-};
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { X, Heart, MapPin, Dumbbell, Sparkles } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button, buttonVariants } from "@/components/ui/button";
+import ProfileCompletionBanner from "@/components/profile-completion-banner";
+import { useAuth } from "@/context/AuthContext";
+
+interface DiscoverUser {
+  id: string;
+  name: string;
+  age: number | null;
+  bio: string | null;
+  gymName: string | null;
+  fitnessGoals: string[];
+  experienceLevel: string | null;
+  photoUrl: string | null;
+  distance: number | null;
+}
+
+interface MatchedUser {
+  id: string;
+  name: string;
+  photoUrl: string | null;
+}
+
+const GRADIENTS = [
+  "from-violet-900 to-indigo-900",
+  "from-rose-900 to-pink-900",
+  "from-emerald-900 to-teal-900",
+  "from-amber-900 to-orange-900",
+  "from-sky-900 to-blue-900",
+  "from-fuchsia-900 to-purple-900",
+];
+
+function gradientFor(id: string): string {
+  // Stable per-user gradient so a card doesn't flicker colors on re-render
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return GRADIENTS[Math.abs(h) % GRADIENTS.length];
+}
 
 export default function MatchPage() {
+  const { user, authFetch, loading: authLoading } = useAuth();
+  const [users, setUsers] = useState<DiscoverUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [matchedWith, setMatchedWith] = useState<MatchedUser | null>(null);
+
+  const fetchDiscover = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await authFetch("/api/discover");
+      if (!res.ok) throw new Error("Failed to load matches");
+      const data = await res.json();
+      setUsers(data.users || []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  }, [authFetch]);
+
+  useEffect(() => {
+    // Wait for AuthContext to resolve so authFetch has a token
+    if (authLoading) return;
+    // If auth resolved with no user, drop the skeleton — AuthContext will be
+    // routing us to /login. Without this we'd be stuck on the loading state
+    // forever during that brief redirect window.
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+    fetchDiscover();
+  }, [authLoading, user, fetchDiscover]);
+
+  const swipe = useCallback(
+    async (target: DiscoverUser, direction: "like" | "pass") => {
+      if (pendingId) return; // debounce double-clicks while a swipe is in flight
+      setPendingId(target.id);
+      // Optimistically remove the card so the next one is in front immediately
+      setUsers((prev) => prev.filter((u) => u.id !== target.id));
+      try {
+        const res = await authFetch("/api/swipe", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ swipeeId: target.id, direction }),
+        });
+        if (!res.ok) {
+          // put the card back if the server rejected it — the user shouldn't
+          // silently lose someone they wanted to like
+          setUsers((prev) => [target, ...prev]);
+          return;
+        }
+        const data = await res.json();
+        if (data.isMatch && data.match?.otherUser) {
+          setMatchedWith(data.match.otherUser);
+        }
+      } catch {
+        setUsers((prev) => [target, ...prev]);
+      } finally {
+        setPendingId(null);
+      }
+    },
+    [authFetch, pendingId]
+  );
+
+  const top = users[0];
+
   return (
     <div className="flex flex-col items-center px-4 pt-6 pb-4 gap-4">
       <div className="w-full max-w-sm">
@@ -20,40 +127,188 @@ export default function MatchPage() {
 
         <ProfileCompletionBanner />
 
-        <div className={`relative w-full rounded-3xl overflow-hidden bg-gradient-to-b ${profile.bg} aspect-[3/4]`}>
+        {/* Card area — single card swap rather than a stack to keep it cheap */}
+        <div className="relative w-full" data-testid="match-card-area">
+          {loading || authLoading ? (
+            <SkeletonCard />
+          ) : error ? (
+            <ErrorState message={error} onRetry={fetchDiscover} />
+          ) : !top ? (
+            <EmptyState onRefresh={fetchDiscover} />
+          ) : (
+            <ProfileCard user={top} disabled={!!pendingId} onSwipe={swipe} />
+          )}
+        </div>
+      </div>
+
+      {/* Match modal */}
+      <Dialog
+        open={!!matchedWith}
+        onOpenChange={(open) => !open && setMatchedWith(null)}
+      >
+        <DialogContent
+          className="sm:max-w-sm text-center"
+          data-testid="match-modal"
+        >
+          <DialogHeader>
+            <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-primary/15 text-primary">
+              <Sparkles size={28} />
+            </div>
+            <DialogTitle className="text-2xl text-center">
+              It&apos;s a Match!
+            </DialogTitle>
+            <DialogDescription className="text-center">
+              You and {matchedWith?.name} liked each other. Say hi!
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-col gap-2 sm:flex-col">
+            <Link
+              href="/matches"
+              className={buttonVariants({ variant: "default", className: "w-full" })}
+            >
+              View matches
+            </Link>
+            <Button
+              variant="secondary"
+              className="w-full"
+              onClick={() => setMatchedWith(null)}
+            >
+              Keep swiping
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function ProfileCard({
+  user,
+  disabled,
+  onSwipe,
+}: {
+  user: DiscoverUser;
+  disabled: boolean;
+  onSwipe: (u: DiscoverUser, dir: "like" | "pass") => void;
+}) {
+  return (
+    <div data-testid="match-card" data-user-id={user.id}>
+      <div
+        className={`relative w-full rounded-3xl overflow-hidden bg-gradient-to-b ${gradientFor(
+          user.id
+        )} aspect-[3/4]`}
+      >
+        {user.photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={user.photoUrl}
+            alt={user.name}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        ) : (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="w-32 h-32 rounded-full bg-white/10 flex items-center justify-center">
               <Dumbbell size={48} className="text-white/40" />
             </div>
           </div>
+        )}
 
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-5">
-            <h2 className="text-xl font-bold text-white">
-              {profile.name}, {profile.age}
-            </h2>
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-5">
+          <h2 className="text-xl font-bold text-white">
+            {user.name}
+            {user.age ? `, ${user.age}` : ""}
+          </h2>
+          {(user.gymName || user.distance != null) && (
             <div className="flex items-center gap-1 text-white/70 text-sm mt-0.5">
               <MapPin size={13} />
-              <span>{profile.gym} · {profile.distance}</span>
+              <span>
+                {user.gymName ?? "Gym not set"}
+                {user.distance != null ? ` · ${user.distance.toFixed(1)} mi` : ""}
+              </span>
             </div>
+          )}
+          {user.fitnessGoals.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-2">
-              {profile.tags.map((tag) => (
-                <Badge key={tag} className="bg-white/15 text-white border-0 text-xs">
+              {user.fitnessGoals.map((tag) => (
+                <Badge
+                  key={tag}
+                  className="bg-white/15 text-white border-0 text-xs"
+                >
                   {tag}
                 </Badge>
               ))}
             </div>
-          </div>
-        </div>
-
-        <div className="flex justify-center gap-8 mt-5">
-          <button className="w-16 h-16 rounded-full bg-secondary border border-border flex items-center justify-center hover:bg-destructive/20 hover:border-destructive transition-colors">
-            <X size={26} className="text-muted-foreground" />
-          </button>
-          <button className="w-16 h-16 rounded-full bg-primary flex items-center justify-center hover:opacity-90 transition-opacity shadow-lg shadow-primary/30">
-            <Heart size={26} className="text-primary-foreground" fill="currentColor" />
-          </button>
+          )}
         </div>
       </div>
+
+      <div className="flex justify-center gap-8 mt-5">
+        <button
+          aria-label="Pass"
+          data-testid="swipe-pass"
+          disabled={disabled}
+          onClick={() => onSwipe(user, "pass")}
+          className="w-16 h-16 rounded-full bg-secondary border border-border flex items-center justify-center hover:bg-destructive/20 hover:border-destructive transition-colors disabled:opacity-50"
+        >
+          <X size={26} className="text-muted-foreground" />
+        </button>
+        <button
+          aria-label="Like"
+          data-testid="swipe-like"
+          disabled={disabled}
+          onClick={() => onSwipe(user, "like")}
+          className="w-16 h-16 rounded-full bg-primary flex items-center justify-center hover:opacity-90 transition-opacity shadow-lg shadow-primary/30 disabled:opacity-50"
+        >
+          <Heart
+            size={26}
+            className="text-primary-foreground"
+            fill="currentColor"
+          />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function EmptyState({ onRefresh }: { onRefresh: () => void }) {
+  return (
+    <div
+      data-testid="match-empty"
+      className="rounded-3xl border border-dashed border-border bg-secondary/40 aspect-[3/4] flex flex-col items-center justify-center text-center px-6"
+    >
+      <div className="w-16 h-16 rounded-full bg-primary/15 text-primary flex items-center justify-center mb-4">
+        <Sparkles size={28} />
+      </div>
+      <h3 className="text-lg font-semibold mb-1">All caught up</h3>
+      <p className="text-sm text-muted-foreground mb-4">
+        You&apos;ve seen everyone nearby. Check back soon for new gym-goers.
+      </p>
+      <Button variant="secondary" onClick={onRefresh}>
+        Refresh
+      </Button>
+    </div>
+  );
+}
+
+function SkeletonCard() {
+  return (
+    <div className="rounded-3xl bg-secondary/60 aspect-[3/4] animate-pulse" />
+  );
+}
+
+function ErrorState({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="rounded-3xl border border-destructive/40 bg-destructive/10 aspect-[3/4] flex flex-col items-center justify-center text-center px-6">
+      <p className="text-sm text-destructive mb-4">{message}</p>
+      <Button variant="secondary" onClick={onRetry}>
+        Try again
+      </Button>
     </div>
   );
 }
