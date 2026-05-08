@@ -5,7 +5,17 @@ import {
   revokeRefreshToken,
   issueTokenPair,
 } from "@/lib/jwt";
-import { REFRESH_COOKIE, setRefreshCookie } from "@/lib/cookies";
+import { REFRESH_COOKIE, setRefreshCookie, clearRefreshCookie } from "@/lib/cookies";
+
+// 401 helper that also clears the stale refresh cookie. Without this, a stale
+// cookie keeps tricking middleware into letting requests through even though
+// the token is gone from Redis (very common in dev when the in-memory token
+// store is wiped on server restart).
+function failAndClearCookie(message: string) {
+  const res = NextResponse.json({ error: message }, { status: 401 });
+  clearRefreshCookie(res);
+  return res;
+}
 
 export async function POST(req: NextRequest) {
   // Read from httpOnly cookie first (browser flow), fall back to JSON body (CLI / mobile clients).
@@ -21,18 +31,18 @@ export async function POST(req: NextRequest) {
   }
 
   if (!refreshToken) {
-    return NextResponse.json({ error: "Missing refresh token" }, { status: 401 });
+    return failAndClearCookie("Missing refresh token");
   }
 
   const userId = await consumeRefreshToken(refreshToken);
   if (!userId) {
-    return NextResponse.json({ error: "Invalid or expired refresh token" }, { status: 401 });
+    return failAndClearCookie("Invalid or expired refresh token");
   }
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) {
     await revokeRefreshToken(refreshToken);
-    return NextResponse.json({ error: "User no longer exists" }, { status: 401 });
+    return failAndClearCookie("User no longer exists");
   }
 
   // Rotate: revoke old refresh token and issue a fresh pair (defense in depth)
