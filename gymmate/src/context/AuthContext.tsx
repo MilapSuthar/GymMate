@@ -17,6 +17,8 @@ interface AuthContextValue {
   accessToken: string | null;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
+  signInWithApple: () => Promise<void>;
   logout: () => Promise<void>;
   authFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 }
@@ -126,6 +128,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [applyToken]
   );
 
+  const exchangeFirebaseToken = useCallback(
+    async (idToken: string) => {
+      const res = await fetch("/api/auth/firebase", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ idToken }),
+      });
+      if (!res.ok) throw new AuthApiError(res.status, await readError(res));
+      const data = await res.json();
+      applyToken(data.accessToken);
+      setUser(data.user);
+    },
+    [applyToken]
+  );
+
+  const signInWithGoogle = useCallback(async () => {
+    // Dynamic import — keeps the firebase client SDK out of the credentials path
+    const { signInWithProvider } = await import("@/lib/firebase-client");
+    const idToken = await signInWithProvider("google");
+    await exchangeFirebaseToken(idToken);
+  }, [exchangeFirebaseToken]);
+
+  const signInWithApple = useCallback(async () => {
+    const { signInWithProvider } = await import("@/lib/firebase-client");
+    const idToken = await signInWithProvider("apple");
+    await exchangeFirebaseToken(idToken);
+  }, [exchangeFirebaseToken]);
+
   const logout = useCallback(async () => {
     try {
       await fetch("/api/auth/logout", {
@@ -175,7 +206,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, accessToken, login, register, logout, authFetch }}
+      value={{
+        user,
+        loading,
+        accessToken,
+        login,
+        register,
+        signInWithGoogle,
+        signInWithApple,
+        logout,
+        authFetch,
+      }}
     >
       {children}
     </AuthContext.Provider>

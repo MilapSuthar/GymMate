@@ -17,8 +17,9 @@ model User {
   id           String   @id @default(cuid())
   email        String   @unique
   passwordHash String?
-  provider     String   @default("credentials") // credentials | google
-  googleId     String?  @unique
+  provider     String   @default("credentials") // credentials | google | apple
+  googleId     String?  @unique // legacy — kept for backward compat with existing rows
+  firebaseUid  String?  @unique // Firebase UID, stable across providers (Google, Apple, etc.)
   name            String
   displayName     String?
   age             Int?
