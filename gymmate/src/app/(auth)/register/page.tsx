@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth, AuthApiError } from "@/context/AuthContext";
+import SocialLoginButtons from "@/components/social-login-buttons";
 
 const schema = z
   .object({
@@ -125,6 +126,10 @@ export default function RegisterPage() {
           {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : "Create account"}
         </Button>
       </form>
+
+      <div className="mt-4">
+        <SocialLoginButtons nextHref="/" />
+      </div>
 
       <p className="text-sm text-muted-foreground text-center mt-6">
         Already have an account?{" "}

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth, AuthApiError } from "@/context/AuthContext";
+import SocialLoginButtons from "@/components/social-login-buttons";
 
 const schema = z.object({
   email: z.string().trim().email("Enter a valid email"),
@@ -94,6 +95,10 @@ export default function LoginPage() {
           {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : "Log in"}
         </Button>
       </form>
+
+      <div className="mt-4">
+        <SocialLoginButtons nextHref="/" />
+      </div>
 
       <p className="text-sm text-muted-foreground text-center mt-6">
         New to GymMate?{" "}
