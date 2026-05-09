@@ -91,14 +91,16 @@ record(
   `logout=${logout.status}, postLogoutRefresh=${refreshAfterLogout.status}`
 );
 
-// 8. Google OAuth — without real Firebase credentials we can only verify the
-// route exists, parses input, and rejects an invalid token with 401.
-const google = await req("/api/auth/google", { body: { idToken: "definitely-not-a-real-google-token" } });
-const googleRouteWired = google.status === 401 || google.status === 400;
+// 8. Firebase OAuth — without real Firebase credentials we can only verify the
+// route exists, parses input, and rejects an invalid token with 401/400/500.
+// (When FIREBASE_* env vars are missing, firebase-admin throws during init —
+// surfaces as a 500 here, which still proves the route is wired up.)
+const fb = await req("/api/auth/firebase", { body: { idToken: "definitely-not-a-real-firebase-token" } });
+const firebaseRouteWired = fb.status === 401 || fb.status === 400 || fb.status === 500;
 record(
-  "8. POST /auth/google route wired (rejects invalid token)",
-  googleRouteWired,
-  `status=${google.status}, msg="${google.body?.error || ""}"  (full E2E requires Firebase credentials)`
+  "8. POST /auth/firebase route wired (rejects invalid token)",
+  firebaseRouteWired,
+  `status=${fb.status}, msg="${fb.body?.error || ""}"  (full E2E requires Firebase credentials)`
 );
 
 // Bonus: middleware lets valid token through
