@@ -30,6 +30,7 @@ model User {
   gymName         String?  // free-text gym (real Gym relation comes later)
   latitude        Float?
   longitude       Float?
+  fcmToken        String?
   goals           String?  // legacy comma-separated (kept for backward compat)
   fitnessGoals    String?  // comma-separated: strength,cardio,weight-loss,muscle-gain,flexibility
   experienceLevel String?  // beginner | intermediate | advanced
@@ -61,6 +62,24 @@ model User {
 
   // Exercise
   workoutLogs WorkoutLog[]
+
+  // Notifications
+  notifications Notification[]
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // "new_match" | "new_message" | "new_answer"
+  title     String
+  body      String
+  data      String?  // JSON payload for deep linking (matchId, questionId, etc.)
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
 }
 
 // =====================
