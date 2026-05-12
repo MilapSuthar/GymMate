@@ -4,7 +4,8 @@ import { withAuth } from "@/lib/auth";
 
 /**
  * GET /api/matches — all matches for the current user, with the other user's
- * basic info and a one-message preview of the latest message in the thread.
+ * basic info, a one-message preview of the latest message, and how many
+ * unread messages the user has in that thread.
  *
  * Sorted by most recent activity: lastMessage timestamp if a thread exists,
  * otherwise the match creation date.
@@ -29,6 +30,20 @@ export const GET = withAuth(async (_req, payload) => {
     },
   });
 
+  // Per-match unread counts in one query — avoids N+1 loops
+  const unreadGrouped = await prisma.message.groupBy({
+    by: ["matchId"],
+    where: {
+      readAt: null,
+      senderId: { not: me },
+      matchId: { in: matches.map((m) => m.id) },
+    },
+    _count: { _all: true },
+  });
+  const unreadByMatch = new Map(
+    unreadGrouped.map((row) => [row.matchId, row._count._all])
+  );
+
   const enriched = matches.map((m) => {
     const other = m.userAId === me ? m.userB : m.userA;
     const last = m.messages[0] ?? null;
@@ -49,6 +64,7 @@ export const GET = withAuth(async (_req, payload) => {
             createdAt: last.createdAt,
           }
         : null,
+      unreadCount: unreadByMatch.get(m.id) ?? 0,
       lastActivityAt: last ? last.createdAt : m.createdAt,
     };
   });
