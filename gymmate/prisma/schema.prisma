@@ -205,17 +205,20 @@ model DietitianProfile {
 }
 
 model MealPlan {
-  id            String             @id @default(cuid())
-  dietitianId   String
-  dietitian     DietitianProfile   @relation(fields: [dietitianId], references: [id])
-  title         String
-  description   String?
+  id             String             @id @default(cuid())
+  dietitianId    String
+  dietitian      DietitianProfile   @relation(fields: [dietitianId], references: [id])
+  title          String
+  description    String?
   caloriesPerDay Int
-  durationWeeks Int?
-  price         Float
-  tags          String?
-  purchases     MealPlanPurchase[]
-  createdAt     DateTime           @default(now())
+  proteinPerDay  Int?
+  carbsPerDay    Int?
+  fatsPerDay     Int?
+  durationWeeks  Int?
+  price          Float
+  tags           String?
+  purchases      MealPlanPurchase[]
+  createdAt      DateTime           @default(now())
 }
 
 model MealPlanPurchase {
@@ -233,6 +236,8 @@ model NutritionLog {
   userId    String
   user      User     @relation(fields: [userId], references: [id])
   date      DateTime
+  name      String?
+  mealType  String?
   calories  Int
   protein   Float
   carbs     Float
