@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { withAuth } from "@/lib/auth";
 import { parseJson } from "@/lib/validation";
+import { sendNotification } from "@/lib/notifications";
 
 const swipeSchema = z.object({
   swipeeId: z.string().min(1),
@@ -78,6 +79,25 @@ export const POST = withAuth(async (req, payload) => {
   // Surface "the other person" so the frontend can show the match modal
   // without a follow-up fetch.
   const other = match.userA.id === swiperId ? match.userB : match.userA;
+  const me = match.userA.id === swiperId ? match.userA : match.userB;
+
+  // Notify both users that they have a new match (best-effort; never throws)
+  await Promise.allSettled([
+    sendNotification({
+      userId: other.id,
+      type: "new_match",
+      title: "You have a new GymMate match!",
+      body: `You and ${me.displayName || me.name} liked each other.`,
+      data: { matchId: match.id, otherUserId: me.id },
+    }),
+    sendNotification({
+      userId: me.id,
+      type: "new_match",
+      title: "You have a new GymMate match!",
+      body: `You and ${other.displayName || other.name} liked each other.`,
+      data: { matchId: match.id, otherUserId: other.id },
+    }),
+  ]);
 
   return NextResponse.json({
     isMatch: true,

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { withAuth } from "@/lib/auth";
 import { parseJson } from "@/lib/validation";
+import { sendNotification } from "@/lib/notifications";
 
 const answerSchema = z.object({
   content: z.string().min(1).max(5000),
@@ -16,7 +17,11 @@ export const POST = withAuth<{ params: Promise<{ questionId: string }> }>(
 
     const question = await prisma.question.findUnique({
       where: { id: questionId },
-      select: { id: true },
+      select: {
+        id: true,
+        authorId: true,
+        title: true,
+      },
     });
     if (!question) {
       return NextResponse.json({ error: "Question not found" }, { status: 404 });
@@ -33,6 +38,18 @@ export const POST = withAuth<{ params: Promise<{ questionId: string }> }>(
         _count: { select: { likes: true } },
       },
     });
+
+    // Notify the question author (skip self-answers)
+    if (question.authorId !== payload.sub) {
+      const answererName = answer.author.displayName || answer.author.name;
+      await sendNotification({
+        userId: question.authorId,
+        type: "new_answer",
+        title: `${answererName} answered your question`,
+        body: question.title,
+        data: { questionId, answerId: answer.id },
+      });
+    }
 
     return NextResponse.json(
       {

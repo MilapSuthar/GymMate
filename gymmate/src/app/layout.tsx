@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import BottomNav from "@/components/bottom-nav";
+import TopBar from "@/components/top-bar";
 import { AuthProvider } from "@/context/AuthContext";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -17,6 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={geist.variable}>
       <body className="min-h-screen bg-background text-foreground flex flex-col">
         <AuthProvider>
+          <TopBar />
           <main className="flex-1 overflow-y-auto pb-20">{children}</main>
           <BottomNav />
           <Toaster richColors position="top-center" />
