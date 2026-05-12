@@ -106,7 +106,11 @@ model Message {
   senderId  String
   sender    User     @relation("MessageSender", fields: [senderId], references: [id])
   content   String
+  readAt    DateTime? // null until the recipient opens the chat
   createdAt DateTime @default(now())
+
+  @@index([matchId, createdAt])
+  @@index([matchId, senderId, readAt])
 }
 
 // =====================
