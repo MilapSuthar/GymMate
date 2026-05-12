@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
- * Seed script — 31 exercises across 7 muscle groups.
+ * Seed script — 31 exercises + 5 meal plans from 3 dietitians.
  * Run: node --env-file=.env prisma/seed.mjs
  * Or:  npx prisma db seed   (if package.json prisma.seed is set)
  */
 import { PrismaClient } from "@prisma/client";
+import { createHash } from "crypto";
 
 const prisma = new PrismaClient();
 
@@ -334,16 +335,159 @@ const exercises = [
   },
 ];
 
+const dietitianUsers = [
+  {
+    email: "emma.walsh@gymmate.dev",
+    name: "Dr. Emma Walsh",
+    registrationId: "RD-001",
+    bio: "Specialist in sports nutrition and body recomposition.",
+  },
+  {
+    email: "james.okafor@gymmate.dev",
+    name: "James Okafor RD",
+    registrationId: "RD-002",
+    bio: "Performance nutritionist working with elite athletes.",
+  },
+  {
+    email: "sofia.reyes@gymmate.dev",
+    name: "Sofia Reyes RD",
+    registrationId: "RD-003",
+    bio: "Flexible dieting and sustainable lifestyle nutrition.",
+  },
+];
+
+const mealPlanData = [
+  {
+    dietitianEmail: "emma.walsh@gymmate.dev",
+    title: "High Protein Cut",
+    description: "A calorie-deficit plan focused on preserving lean muscle while burning fat. High protein keeps you full and maintains strength.",
+    caloriesPerDay: 1900,
+    proteinPerDay: 180,
+    carbsPerDay: 150,
+    fatsPerDay: 55,
+    durationWeeks: 8,
+    price: 29.0,
+    tags: "Fat Loss,Muscle Retention",
+  },
+  {
+    dietitianEmail: "james.okafor@gymmate.dev",
+    title: "Clean Bulk",
+    description: "A structured caloric surplus plan to maximise muscle growth while minimising fat gain. Timed carbs around training for peak performance.",
+    caloriesPerDay: 2800,
+    proteinPerDay: 200,
+    carbsPerDay: 320,
+    fatsPerDay: 80,
+    durationWeeks: 12,
+    price: 35.0,
+    tags: "Muscle Gain,Performance",
+  },
+  {
+    dietitianEmail: "sofia.reyes@gymmate.dev",
+    title: "Balanced Maintenance",
+    description: "Flexible, sustainable macros to maintain your current physique and energy levels. No rigid meal timing — fits any lifestyle.",
+    caloriesPerDay: 2200,
+    proteinPerDay: 150,
+    carbsPerDay: 240,
+    fatsPerDay: 70,
+    durationWeeks: null,
+    price: 19.0,
+    tags: "Maintenance,Flexible",
+  },
+  {
+    dietitianEmail: "emma.walsh@gymmate.dev",
+    title: "Keto Shred",
+    description: "Ultra-low carb, high fat protocol for rapid fat loss. Puts you in ketosis within days. Best for those who prefer fat as a fuel source.",
+    caloriesPerDay: 1800,
+    proteinPerDay: 160,
+    carbsPerDay: 30,
+    fatsPerDay: 130,
+    durationWeeks: 6,
+    price: 24.0,
+    tags: "Fat Loss,Keto",
+  },
+  {
+    dietitianEmail: "james.okafor@gymmate.dev",
+    title: "Athlete Performance",
+    description: "High-carb periodised plan for competitive athletes and heavy trainers. Fuel your sessions, recover faster, and peak for competition.",
+    caloriesPerDay: 3200,
+    proteinPerDay: 220,
+    carbsPerDay: 400,
+    fatsPerDay: 80,
+    durationWeeks: 16,
+    price: 49.0,
+    tags: "Performance,Endurance",
+  },
+];
+
+async function seedNutrition() {
+  const existingPlans = await prisma.mealPlan.count();
+  if (existingPlans > 0) {
+    console.log(`Already seeded (${existingPlans} meal plans). Skipping.`);
+    return;
+  }
+
+  // Derive a stable password hash without bcrypt (just for seed data)
+  const fakeHash = (email) => "$2b$12$" + createHash("sha256").update(email).digest("hex").slice(0, 53);
+
+  for (const d of dietitianUsers) {
+    const user = await prisma.user.upsert({
+      where: { email: d.email },
+      update: {},
+      create: {
+        email: d.email,
+        name: d.name,
+        passwordHash: fakeHash(d.email),
+      },
+    });
+    await prisma.dietitianProfile.upsert({
+      where: { userId: user.id },
+      update: {},
+      create: {
+        userId: user.id,
+        registrationId: d.registrationId,
+        bio: d.bio,
+        verified: true,
+      },
+    });
+    console.log(`Dietitian: ${d.name}`);
+  }
+
+  for (const plan of mealPlanData) {
+    const dietitianUser = await prisma.user.findUnique({ where: { email: plan.dietitianEmail } });
+    const dietitianProfile = await prisma.dietitianProfile.findUnique({ where: { userId: dietitianUser.id } });
+    await prisma.mealPlan.create({
+      data: {
+        dietitianId: dietitianProfile.id,
+        title: plan.title,
+        description: plan.description,
+        caloriesPerDay: plan.caloriesPerDay,
+        proteinPerDay: plan.proteinPerDay,
+        carbsPerDay: plan.carbsPerDay,
+        fatsPerDay: plan.fatsPerDay,
+        durationWeeks: plan.durationWeeks,
+        price: plan.price,
+        tags: plan.tags,
+      },
+    });
+    console.log(`Meal plan: ${plan.title}`);
+  }
+
+  const total = await prisma.mealPlan.count();
+  console.log(`Done. ${total} meal plans in the database.`);
+}
+
 async function main() {
   const existing = await prisma.exercise.count();
   if (existing > 0) {
-    console.log(`Already seeded (${existing} exercises). Skipping.`);
-    return;
+    console.log(`Already seeded (${existing} exercises). Skipping exercises.`);
+  } else {
+    console.log(`Seeding ${exercises.length} exercises…`);
+    await prisma.exercise.createMany({ data: exercises });
+    const total = await prisma.exercise.count();
+    console.log(`Done. ${total} exercises in the database.`);
   }
-  console.log(`Seeding ${exercises.length} exercises…`);
-  await prisma.exercise.createMany({ data: exercises });
-  const total = await prisma.exercise.count();
-  console.log(`Done. ${total} exercises in the database.`);
+
+  await seedNutrition();
 }
 
 main()
