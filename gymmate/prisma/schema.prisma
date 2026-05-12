@@ -43,8 +43,10 @@ model User {
   messagesSent   Message[] @relation("MessageSender")
 
   // Help Board
-  questions Question[]
-  answers   Answer[]
+  questions     Question[]
+  answers       Answer[]
+  questionLikes QuestionLike[]
+  answerLikes   AnswerLike[]
 
   // Trainer side
   trainerProfile TrainerProfile?
@@ -113,25 +115,48 @@ model Message {
 // HELP BOARD
 // =====================
 model Question {
-  id        String   @id @default(cuid())
+  id        String         @id @default(cuid())
   authorId  String
-  author    User     @relation(fields: [authorId], references: [id])
+  author    User           @relation(fields: [authorId], references: [id])
+  title     String
   body      String
-  tags      String?  // comma-separated
-  likes     Int      @default(0)
+  tags      String?        // comma-separated
   answers   Answer[]
-  createdAt DateTime @default(now())
+  likes     QuestionLike[]
+  createdAt DateTime       @default(now())
 }
 
 model Answer {
+  id         String       @id @default(cuid())
+  questionId String
+  question   Question     @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  authorId   String
+  author     User         @relation(fields: [authorId], references: [id])
+  body       String
+  likes      AnswerLike[]
+  createdAt  DateTime     @default(now())
+}
+
+model QuestionLike {
   id         String   @id @default(cuid())
   questionId String
-  question   Question @relation(fields: [questionId], references: [id])
-  authorId   String
-  author     User     @relation(fields: [authorId], references: [id])
-  body       String
-  likes      Int      @default(0)
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
   createdAt  DateTime @default(now())
+
+  @@unique([questionId, userId])
+}
+
+model AnswerLike {
+  id        String   @id @default(cuid())
+  answerId  String
+  answer    Answer   @relation(fields: [answerId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([answerId, userId])
 }
 
 // =====================
