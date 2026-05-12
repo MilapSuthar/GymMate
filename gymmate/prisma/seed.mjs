@@ -488,6 +488,8 @@ const trainerData = [
     tags: "Powerlifting,Weight Loss,Beginners",
     rating: 4.9,
     reviewCount: 48,
+    latitude: 51.5074,   // Central London (0 km from viewer at center)
+    longitude: -0.1278,
   },
   {
     email: "aisha.patel@gymmate.dev",
@@ -500,6 +502,8 @@ const trainerData = [
     tags: "HIIT,Cardio,Mobility",
     rating: 4.8,
     reviewCount: 33,
+    latitude: 51.5400,   // Camden (~3.6 km)
+    longitude: -0.1426,
   },
   {
     email: "ryan.torres@gymmate.dev",
@@ -512,6 +516,8 @@ const trainerData = [
     tags: "Bodybuilding,Nutrition,Bulking",
     rating: 4.7,
     reviewCount: 61,
+    latitude: 51.4742,   // Hounslow (~17 km)
+    longitude: -0.3614,
   },
   {
     email: "priya.sharma@gymmate.dev",
@@ -524,6 +530,8 @@ const trainerData = [
     tags: "Weight Loss,Mindset,Lifestyle",
     rating: 4.9,
     reviewCount: 27,
+    latitude: 51.5128,   // City of London (~1.4 km)
+    longitude: -0.1090,
   },
   {
     email: "liam.obrien@gymmate.dev",
@@ -536,6 +544,8 @@ const trainerData = [
     tags: "Sports,Speed,Power",
     rating: 4.6,
     reviewCount: 19,
+    latitude: 51.4762,   // Greenwich (~10 km)
+    longitude: -0.0085,
   },
   {
     email: "fatima.al-hassan@gymmate.dev",
@@ -548,6 +558,8 @@ const trainerData = [
     tags: "Yoga,Flexibility,Recovery",
     rating: 4.8,
     reviewCount: 42,
+    latitude: 51.5552,   // Wembley (~12 km)
+    longitude: -0.2787,
   },
   {
     email: "ben.carter@gymmate.dev",
@@ -560,6 +572,8 @@ const trainerData = [
     tags: "Kettlebells,Functional,Conditioning",
     rating: 4.5,
     reviewCount: 15,
+    latitude: 51.5025,   // Westminster (~1 km)
+    longitude: -0.1357,
   },
   {
     email: "zoe.marshall@gymmate.dev",
@@ -572,47 +586,61 @@ const trainerData = [
     tags: "Postnatal,Pregnancy,Rehabilitation",
     rating: 5.0,
     reviewCount: 22,
+    latitude: 51.6452,   // Barnet (~16 km)
+    longitude: -0.1684,
   },
 ];
 
 async function seedTrainers() {
   const existingTrainers = await prisma.trainerProfile.count();
-  if (existingTrainers > 0) {
-    console.log(`Already seeded (${existingTrainers} trainers). Skipping trainers.`);
-    return;
-  }
+  const shouldCreate = existingTrainers === 0;
 
   const fakeHash = (email) => "$2b$12$" + createHash("sha256").update(email + "trainer").digest("hex").slice(0, 53);
 
-  for (const t of trainerData) {
-    const user = await prisma.user.upsert({
-      where: { email: t.email },
-      update: {},
-      create: {
-        email: t.email,
-        name: t.name,
-        gymName: t.gymName,
-        passwordHash: fakeHash(t.email),
-      },
-    });
-    await prisma.trainerProfile.create({
-      data: {
-        userId: user.id,
-        specialty: t.specialty,
-        bio: t.bio,
-        pricePerSession: t.pricePerSession,
-        certifications: t.certifications,
-        tags: t.tags,
-        verified: true,
-        rating: t.rating,
-        reviewCount: t.reviewCount,
-      },
-    });
-    console.log(`Trainer: ${t.name}`);
+  if (shouldCreate) {
+    for (const t of trainerData) {
+      const user = await prisma.user.upsert({
+        where: { email: t.email },
+        update: {},
+        create: {
+          email: t.email,
+          name: t.name,
+          gymName: t.gymName,
+          passwordHash: fakeHash(t.email),
+          latitude: t.latitude,
+          longitude: t.longitude,
+        },
+      });
+      await prisma.trainerProfile.create({
+        data: {
+          userId: user.id,
+          specialty: t.specialty,
+          bio: t.bio,
+          pricePerSession: t.pricePerSession,
+          certifications: t.certifications,
+          tags: t.tags,
+          verified: true,
+          rating: t.rating,
+          reviewCount: t.reviewCount,
+        },
+      });
+      console.log(`Trainer: ${t.name}`);
+    }
+    const total = await prisma.trainerProfile.count();
+    console.log(`Done. ${total} trainer profiles in the database.`);
+  } else {
+    console.log(`Already seeded (${existingTrainers} trainers). Updating locations only.`);
   }
 
-  const total = await prisma.trainerProfile.count();
-  console.log(`Done. ${total} trainer profiles in the database.`);
+  // Always backfill lat/lng for seeded trainer emails so location filtering works
+  for (const t of trainerData) {
+    await prisma.user
+      .update({
+        where: { email: t.email },
+        data: { latitude: t.latitude, longitude: t.longitude },
+      })
+      .catch(() => null);
+  }
 }
 
 async function main() {

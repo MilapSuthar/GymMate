@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { withAuth } from "@/lib/auth";
 import { parseGoals } from "@/lib/profile";
+import { haversineKm } from "@/lib/geo";
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
@@ -14,6 +15,7 @@ const MAX_LIMIT = 50;
  * Query params:
  *   - limit (1..50, default 20)
  *   - cursor (User.id) — opaque cursor for keyset pagination
+ *   - maxDistance (km) — only return users within this radius of viewer
  */
 export const GET = withAuth(async (req, payload) => {
   const url = new URL(req.url);
@@ -22,11 +24,16 @@ export const GET = withAuth(async (req, payload) => {
     ? Math.min(Math.max(limitParam, 1), MAX_LIMIT)
     : DEFAULT_LIMIT;
   const cursor = url.searchParams.get("cursor") || undefined;
+  const maxDistanceParam = parseFloat(url.searchParams.get("maxDistance") || "");
+  const maxDistance = Number.isFinite(maxDistanceParam) && maxDistanceParam > 0
+    ? maxDistanceParam
+    : null;
 
-  // Pull the IDs we need to exclude in two cheap queries up front.
-  // For SQLite + tens of thousands of users this is fine; if the swipe table
-  // ever grows huge we'd push this to a NOT EXISTS subquery instead.
-  const [swipes, matchesA, matchesB] = await Promise.all([
+  const [viewer, swipes, matchesA, matchesB] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { latitude: true, longitude: true },
+    }),
     prisma.swipe.findMany({
       where: { swiperId: payload.sub },
       select: { swipedId: true },
@@ -46,21 +53,41 @@ export const GET = withAuth(async (req, payload) => {
   for (const m of matchesA) excludeIds.add(m.userBId);
   for (const m of matchesB) excludeIds.add(m.userAId);
 
+  const viewerHasCoords = viewer?.latitude != null && viewer?.longitude != null;
+
+  // When filtering by distance we need to fetch more than `limit` because
+  // some candidates will be filtered out post-query. Over-fetch generously.
+  const fetchSize = maxDistance != null && viewerHasCoords ? MAX_LIMIT * 4 : limit + 1;
+
   const users = await prisma.user.findMany({
     where: { id: { notIn: Array.from(excludeIds) } },
     include: {
       photos: { orderBy: { position: "asc" }, take: 1 },
     },
     orderBy: { createdAt: "desc" },
-    take: limit + 1, // one extra to know if there's a next page
+    take: fetchSize,
     ...(cursor && { skip: 1, cursor: { id: cursor } }),
   });
 
-  const hasMore = users.length > limit;
-  const page = hasMore ? users.slice(0, limit) : users;
+  let enriched = users.map((u) => {
+    const distance =
+      viewerHasCoords && u.latitude != null && u.longitude != null
+        ? haversineKm(viewer!.latitude!, viewer!.longitude!, u.latitude, u.longitude)
+        : null;
+    return { user: u, distance };
+  });
+
+  if (maxDistance != null && viewerHasCoords) {
+    // Keep users within radius. Users with unknown coords are excluded when
+    // an explicit radius filter is set — otherwise the slider does nothing.
+    enriched = enriched.filter((e) => e.distance != null && e.distance <= maxDistance);
+  }
+
+  const hasMore = enriched.length > limit;
+  const page = hasMore ? enriched.slice(0, limit) : enriched;
 
   return NextResponse.json({
-    users: page.map((u) => ({
+    users: page.map(({ user: u, distance }) => ({
       id: u.id,
       name: u.displayName || u.name,
       age: u.age,
@@ -69,10 +96,8 @@ export const GET = withAuth(async (req, payload) => {
       fitnessGoals: parseGoals(u.fitnessGoals),
       experienceLevel: u.experienceLevel,
       photoUrl: u.photos[0]?.url ?? u.photoUrl ?? null,
-      // Distance is a placeholder until we have geolocation wired up.
-      // Frontend renders this as "0.x mi" but it's not real geo data yet.
-      distance: null as number | null,
+      distance: distance != null ? Math.round(distance * 10) / 10 : null,
     })),
-    nextCursor: hasMore ? page[page.length - 1].id : null,
+    nextCursor: hasMore ? page[page.length - 1].user.id : null,
   });
 });

@@ -28,6 +28,8 @@ model User {
   gymId           String?
   gym             Gym?     @relation(fields: [gymId], references: [id])
   gymName         String?  // free-text gym (real Gym relation comes later)
+  latitude        Float?
+  longitude       Float?
   goals           String?  // legacy comma-separated (kept for backward compat)
   fitnessGoals    String?  // comma-separated: strength,cardio,weight-loss,muscle-gain,flexibility
   experienceLevel String?  // beginner | intermediate | advanced
