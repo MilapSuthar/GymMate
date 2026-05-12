@@ -247,8 +247,9 @@ model NutritionLog {
 model Exercise {
   id          String       @id @default(cuid())
   name        String
-  muscleGroup String       // chest, back, legs, etc.
-  category    String       // push, pull, legs, full_body
+  muscleGroup String       // chest, back, legs, shoulders, arms, core, cardio
+  category    String       // push, pull, legs, cardio
+  difficulty  String?      // beginner, intermediate, advanced
   equipment   String?
   description String?
   videoUrl    String?
