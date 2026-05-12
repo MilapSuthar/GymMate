@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
+import { DISTANCE_OPTIONS } from "@/lib/geo";
 
 interface Trainer {
   id: string;
@@ -20,6 +21,7 @@ interface Trainer {
   verified: boolean;
   rating: number | null;
   reviewCount: number;
+  distance: number | null;
 }
 
 const SPECIALTY_FILTERS = [
@@ -37,12 +39,16 @@ export default function TrainersPage() {
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [loading, setLoading] = useState(true);
   const [specialty, setSpecialty] = useState("");
+  const [maxDistance, setMaxDistance] = useState<number | null>(null);
 
   const fetchTrainers = useCallback(async () => {
     setLoading(true);
     try {
-      const params = specialty ? `?specialty=${encodeURIComponent(specialty)}` : "";
-      const res = await authFetch(`/api/trainers${params}`);
+      const params = new URLSearchParams();
+      if (specialty) params.set("specialty", specialty);
+      if (maxDistance != null) params.set("maxDistance", String(maxDistance));
+      const qs = params.toString();
+      const res = await authFetch(`/api/trainers${qs ? `?${qs}` : ""}`);
       if (!res.ok) throw new Error();
       const data = await res.json();
       setTrainers(data.trainers);
@@ -51,7 +57,7 @@ export default function TrainersPage() {
     } finally {
       setLoading(false);
     }
-  }, [authFetch, specialty]);
+  }, [authFetch, specialty, maxDistance]);
 
   useEffect(() => {
     if (authLoading || !user) return;
@@ -66,7 +72,7 @@ export default function TrainersPage() {
       </p>
 
       {/* Specialty filter */}
-      <div className="flex gap-2 overflow-x-auto pb-2 mb-5 scrollbar-none">
+      <div className="flex gap-2 overflow-x-auto pb-2 mb-2 scrollbar-none">
         {SPECIALTY_FILTERS.map((f) => (
           <button
             key={f.value}
@@ -78,6 +84,33 @@ export default function TrainersPage() {
             }`}
           >
             {f.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Distance filter */}
+      <div className="flex gap-2 overflow-x-auto pb-2 mb-5 scrollbar-none">
+        <button
+          onClick={() => setMaxDistance(null)}
+          className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors border ${
+            maxDistance === null
+              ? "border-primary bg-primary/10 text-primary"
+              : "border-border text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Any
+        </button>
+        {DISTANCE_OPTIONS.map((km) => (
+          <button
+            key={km}
+            onClick={() => setMaxDistance(km)}
+            className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors border ${
+              maxDistance === km
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {km} km
           </button>
         ))}
       </div>
@@ -119,10 +152,13 @@ export default function TrainersPage() {
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">{t.specialty}</p>
-                  {t.gym && (
+                  {(t.gym || t.distance != null) && (
                     <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                       <MapPin size={11} />
-                      {t.gym}
+                      <span>
+                        {t.gym ?? "Gym not set"}
+                        {t.distance != null ? ` · ${t.distance.toFixed(1)} km away` : ""}
+                      </span>
                     </div>
                   )}
                 </div>
