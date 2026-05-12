@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { X, Heart, MapPin, Dumbbell, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,7 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import ProfileCompletionBanner from "@/components/profile-completion-banner";
 import { useAuth } from "@/context/AuthContext";
+import { DISTANCE_OPTIONS } from "@/lib/geo";
 
 interface DiscoverUser {
   id: string;
@@ -57,34 +58,67 @@ export default function MatchPage() {
   const [error, setError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [matchedWith, setMatchedWith] = useState<MatchedUser | null>(null);
+  const [maxDistance, setMaxDistance] = useState<number | null>(null);
+  const locationAskedRef = useRef(false);
 
-  const fetchDiscover = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await authFetch("/api/discover");
-      if (!res.ok) throw new Error("Failed to load matches");
-      const data = await res.json();
-      setUsers(data.users || []);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
-    } finally {
-      setLoading(false);
-    }
-  }, [authFetch]);
+  const fetchDiscover = useCallback(
+    async (km: number | null) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const qs = km != null ? `?maxDistance=${km}` : "";
+        const res = await authFetch(`/api/discover${qs}`);
+        if (!res.ok) throw new Error("Failed to load matches");
+        const data = await res.json();
+        setUsers(data.users || []);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Something went wrong");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [authFetch]
+  );
+
+  // Ask for browser location once after auth resolves; save coords if granted.
+  useEffect(() => {
+    if (authLoading || !user || locationAskedRef.current) return;
+    locationAskedRef.current = true;
+
+    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          await authFetch("/api/profile/location", {
+            method: "PUT",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude,
+            }),
+          });
+          // Refetch so distances populate on the visible cards
+          fetchDiscover(maxDistance);
+        } catch {
+          // Silent — discover still works without coords
+        }
+      },
+      () => {
+        // Permission denied or unavailable — graceful no-op
+      },
+      { timeout: 8000, maximumAge: 5 * 60 * 1000 }
+    );
+  }, [authLoading, user, authFetch, fetchDiscover, maxDistance]);
 
   useEffect(() => {
-    // Wait for AuthContext to resolve so authFetch has a token
     if (authLoading) return;
-    // If auth resolved with no user, drop the skeleton — AuthContext will be
-    // routing us to /login. Without this we'd be stuck on the loading state
-    // forever during that brief redirect window.
     if (!user) {
       setLoading(false);
       return;
     }
-    fetchDiscover();
-  }, [authLoading, user, fetchDiscover]);
+    fetchDiscover(maxDistance);
+  }, [authLoading, user, fetchDiscover, maxDistance]);
 
   const swipe = useCallback(
     async (target: DiscoverUser, direction: "like" | "pass") => {
@@ -127,14 +161,41 @@ export default function MatchPage() {
 
         <ProfileCompletionBanner />
 
+        {/* Distance filter chip row */}
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-none">
+          <button
+            onClick={() => setMaxDistance(null)}
+            className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+              maxDistance === null
+                ? "bg-primary text-primary-foreground"
+                : "bg-secondary text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Any
+          </button>
+          {DISTANCE_OPTIONS.map((km) => (
+            <button
+              key={km}
+              onClick={() => setMaxDistance(km)}
+              className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                maxDistance === km
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {km} km
+            </button>
+          ))}
+        </div>
+
         {/* Card area — single card swap rather than a stack to keep it cheap */}
         <div className="relative w-full" data-testid="match-card-area">
           {loading || authLoading ? (
             <SkeletonCard />
           ) : error ? (
-            <ErrorState message={error} onRetry={fetchDiscover} />
+            <ErrorState message={error} onRetry={() => fetchDiscover(maxDistance)} />
           ) : !top ? (
-            <EmptyState onRefresh={fetchDiscover} />
+            <EmptyState onRefresh={() => fetchDiscover(maxDistance)} />
           ) : (
             <ProfileCard user={top} disabled={!!pendingId} onSwipe={swipe} />
           )}
@@ -223,7 +284,7 @@ function ProfileCard({
               <MapPin size={13} />
               <span>
                 {user.gymName ?? "Gym not set"}
-                {user.distance != null ? ` · ${user.distance.toFixed(1)} mi` : ""}
+                {user.distance != null ? ` · ${user.distance.toFixed(1)} km` : ""}
               </span>
             </div>
           )}
