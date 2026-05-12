@@ -476,6 +476,145 @@ async function seedNutrition() {
   console.log(`Done. ${total} meal plans in the database.`);
 }
 
+const trainerData = [
+  {
+    email: "marcus.lee@gymmate.dev",
+    name: "Marcus Lee",
+    gymName: "PureGym City Centre",
+    specialty: "Strength & Conditioning",
+    bio: "Former competitive powerlifter with 8 years of personal training experience. Specialises in building raw strength and transforming beginners into confident lifters.",
+    pricePerSession: 45,
+    certifications: "REPS Level 3, British Powerlifting Coach",
+    tags: "Powerlifting,Weight Loss,Beginners",
+    rating: 4.9,
+    reviewCount: 48,
+  },
+  {
+    email: "aisha.patel@gymmate.dev",
+    name: "Aisha Patel",
+    gymName: "Anytime Fitness",
+    specialty: "HIIT & Functional Fitness",
+    bio: "Certified HIIT coach and mobility specialist. Her high-energy sessions combine metabolic conditioning with movement quality work — sweat guaranteed.",
+    pricePerSession: 40,
+    certifications: "REPS Level 3, FMS Certified",
+    tags: "HIIT,Cardio,Mobility",
+    rating: 4.8,
+    reviewCount: 33,
+  },
+  {
+    email: "ryan.torres@gymmate.dev",
+    name: "Ryan Torres",
+    gymName: "JD Gyms",
+    specialty: "Bodybuilding & Hypertrophy",
+    bio: "Natural bodybuilder and UKBFF competitor. Combines evidence-based hypertrophy programming with nutrition coaching to help clients build their best physique.",
+    pricePerSession: 50,
+    certifications: "REPS Level 3, Precision Nutrition",
+    tags: "Bodybuilding,Nutrition,Bulking",
+    rating: 4.7,
+    reviewCount: 61,
+  },
+  {
+    email: "priya.sharma@gymmate.dev",
+    name: "Priya Sharma",
+    gymName: "PureGym City Centre",
+    specialty: "Weight Loss & Lifestyle",
+    bio: "Dedicated to sustainable fat loss without extremes. Priya blends mindset coaching with smart nutrition and training to create lasting lifestyle change.",
+    pricePerSession: 38,
+    certifications: "REPS Level 3, Lifestyle & Weight Management",
+    tags: "Weight Loss,Mindset,Lifestyle",
+    rating: 4.9,
+    reviewCount: 27,
+  },
+  {
+    email: "liam.obrien@gymmate.dev",
+    name: "Liam O'Brien",
+    gymName: "Anytime Fitness",
+    specialty: "Sports Performance",
+    bio: "S&C coach for amateur rugby, football, and combat sports athletes. Programming focuses on speed, power, and injury resilience.",
+    pricePerSession: 55,
+    certifications: "REPS Level 3, UKSCA Accredited",
+    tags: "Sports,Speed,Power",
+    rating: 4.6,
+    reviewCount: 19,
+  },
+  {
+    email: "fatima.al-hassan@gymmate.dev",
+    name: "Fatima Al-Hassan",
+    gymName: "JD Gyms",
+    specialty: "Yoga & Flexibility",
+    bio: "Yoga teacher and mobility coach integrating breath work, flexibility, and mindful movement. Works with clients recovering from injury or managing chronic pain.",
+    pricePerSession: 35,
+    certifications: "RYT-500, REPS Level 3",
+    tags: "Yoga,Flexibility,Recovery",
+    rating: 4.8,
+    reviewCount: 42,
+  },
+  {
+    email: "ben.carter@gymmate.dev",
+    name: "Ben Carter",
+    gymName: "PureGym City Centre",
+    specialty: "Strength & Conditioning",
+    bio: "Qualified S&C coach and ex-army PTI. Builds robust, functional athletes using barbell training, kettlebells, and conditioning circuits.",
+    pricePerSession: 42,
+    certifications: "REPS Level 3, Army PTI",
+    tags: "Kettlebells,Functional,Conditioning",
+    rating: 4.5,
+    reviewCount: 15,
+  },
+  {
+    email: "zoe.marshall@gymmate.dev",
+    name: "Zoe Marshall",
+    gymName: "Anytime Fitness",
+    specialty: "Pre & Postnatal Fitness",
+    bio: "Specialist in pre and postnatal exercise, helping women train safely through pregnancy and rebuild strength after birth. Compassionate, evidence-led approach.",
+    pricePerSession: 45,
+    certifications: "REPS Level 3, Pre/Postnatal Specialist",
+    tags: "Postnatal,Pregnancy,Rehabilitation",
+    rating: 5.0,
+    reviewCount: 22,
+  },
+];
+
+async function seedTrainers() {
+  const existingTrainers = await prisma.trainerProfile.count();
+  if (existingTrainers > 0) {
+    console.log(`Already seeded (${existingTrainers} trainers). Skipping trainers.`);
+    return;
+  }
+
+  const fakeHash = (email) => "$2b$12$" + createHash("sha256").update(email + "trainer").digest("hex").slice(0, 53);
+
+  for (const t of trainerData) {
+    const user = await prisma.user.upsert({
+      where: { email: t.email },
+      update: {},
+      create: {
+        email: t.email,
+        name: t.name,
+        gymName: t.gymName,
+        passwordHash: fakeHash(t.email),
+      },
+    });
+    await prisma.trainerProfile.create({
+      data: {
+        userId: user.id,
+        specialty: t.specialty,
+        bio: t.bio,
+        pricePerSession: t.pricePerSession,
+        certifications: t.certifications,
+        tags: t.tags,
+        verified: true,
+        rating: t.rating,
+        reviewCount: t.reviewCount,
+      },
+    });
+    console.log(`Trainer: ${t.name}`);
+  }
+
+  const total = await prisma.trainerProfile.count();
+  console.log(`Done. ${total} trainer profiles in the database.`);
+}
+
 async function main() {
   const existing = await prisma.exercise.count();
   if (existing > 0) {
@@ -488,6 +627,7 @@ async function main() {
   }
 
   await seedNutrition();
+  await seedTrainers();
 }
 
 main()
