@@ -163,32 +163,37 @@ model AnswerLike {
 // TRAINERS
 // =====================
 model TrainerProfile {
-  id          String    @id @default(cuid())
-  userId      String    @unique
-  user        User      @relation(fields: [userId], references: [id])
-  gymId       String?
-  gym         Gym?      @relation(fields: [gymId], references: [id])
-  specialty   String
-  bio         String?
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id])
+  gymId           String?
+  gym             Gym?      @relation(fields: [gymId], references: [id])
+  specialty       String
+  bio             String?
   pricePerSession Float
   certifications  String?
-  verified    Boolean   @default(false)
-  rating      Float?
-  reviewCount Int       @default(0)
-  bookings    Booking[]
-  createdAt   DateTime  @default(now())
+  tags            String?   // comma-separated e.g. "Powerlifting,Weight Loss"
+  verified        Boolean   @default(false)
+  rating          Float?
+  reviewCount     Int       @default(0)
+  bookings        Booking[]
+  createdAt       DateTime  @default(now())
 }
 
 model Booking {
-  id         String         @id @default(cuid())
-  clientId   String
-  client     User           @relation("ClientBookings", fields: [clientId], references: [id])
-  trainerId  String
-  trainer    TrainerProfile @relation(fields: [trainerId], references: [id])
-  scheduledAt DateTime
-  status     String         @default("pending") // pending, confirmed, completed, cancelled
-  paidAmount Float
-  createdAt  DateTime       @default(now())
+  id              String         @id @default(cuid())
+  clientId        String
+  client          User           @relation("ClientBookings", fields: [clientId], references: [id])
+  trainerId       String
+  trainer         TrainerProfile @relation(fields: [trainerId], references: [id])
+  scheduledAt     DateTime
+  durationMins    Int?
+  notes           String?
+  status          String         @default("pending") // pending, confirmed, completed, cancelled
+  paidAmount      Float
+  paid            Boolean        @default(false)
+  stripeSessionId String?
+  createdAt       DateTime       @default(now())
 }
 
 // =====================
