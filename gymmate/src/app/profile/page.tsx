@@ -2,8 +2,17 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Pencil, Dumbbell, MapPin, Loader2, Briefcase, ChevronRight } from "lucide-react";
+import {
+  Pencil,
+  Dumbbell,
+  MapPin,
+  Loader2,
+  Briefcase,
+  ChevronRight,
+  LogOut,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 
 interface Profile {
@@ -20,7 +29,7 @@ interface Profile {
 }
 
 export default function ProfilePage() {
-  const { authFetch, loading } = useAuth();
+  const { authFetch, logout, loading } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [fetching, setFetching] = useState(true);
 
@@ -169,6 +178,18 @@ export default function ProfilePage() {
           </div>
           <ChevronRight size={16} className="text-muted-foreground shrink-0" />
         </Link>
+      </section>
+
+      <section className="mt-8 pt-6 border-t border-border">
+        <Button
+          variant="destructive"
+          onClick={() => logout()}
+          data-testid="profile-logout"
+          className="w-full h-10 gap-2"
+        >
+          <LogOut size={16} />
+          Log out
+        </Button>
       </section>
     </div>
   );
