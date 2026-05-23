@@ -23,6 +23,18 @@ model User {
   name            String
   displayName     String?
   age             Int?
+  // Authoritative source of age — set once at signup (18+ enforced server-side).
+  // We keep the legacy `age` column for back-compat with profiles created before
+  // the age gate; new code should read age via `getAge(dateOfBirth)`.
+  dateOfBirth     DateTime?
+  // Self-identified gender. Free-ish set: "male" | "female" | "non_binary" | "other".
+  gender          String?
+  // Comma-separated list of genders this user wants to see in discover.
+  // Empty/null means "everyone". Example: "male,female".
+  showMeGenders   String?
+  // Age preference window for who the user wants to see. Null = no bound.
+  minAgePref      Int?
+  maxAgePref      Int?
   bio             String?
   photoUrl        String?
   gymId           String?
@@ -34,6 +46,15 @@ model User {
   goals           String?  // legacy comma-separated (kept for backward compat)
   fitnessGoals    String?  // comma-separated: strength,cardio,weight-loss,muscle-gain,flexibility
   experienceLevel String?  // beginner | intermediate | advanced
+  // Comma-separated `day_slot` tokens describing when the user is typically
+  // at the gym, e.g. "mon_morning,wed_morning,fri_evening". 35 possible
+  // values (7 days × 5 slots). Used by discover to compute overlap-based
+  // ranking — the GymMate moat. Empty/null = "unknown" (no overlap signal).
+  gymSchedule     String?
+  // Daily-streak gamification. `streakCount` is the run of consecutive UTC
+  // days the user has opened the app; `lastActiveOn` is the last day counted.
+  streakCount     Int       @default(0)
+  lastActiveOn    DateTime?
   photos          UserPhoto[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -65,6 +86,43 @@ model User {
 
   // Notifications
   notifications Notification[]
+
+  // Safety — reports and blocks
+  reportsSent     Report[] @relation("Reporter")
+  reportsReceived Report[] @relation("Reported")
+  blocksSent      Block[]  @relation("Blocker")
+  blocksReceived  Block[]  @relation("Blocked")
+}
+
+// =====================
+// SAFETY: REPORTS & BLOCKS
+// =====================
+model Report {
+  id          String   @id @default(cuid())
+  reporterId  String
+  reporter    User     @relation("Reporter", fields: [reporterId], references: [id])
+  reportedId  String
+  reported    User     @relation("Reported", fields: [reportedId], references: [id])
+  reason      String   // free text or one of the canonical reason strings
+  context     String?  // optional: matchId, questionId, messageId — JSON
+  status      String   @default("open") // open | reviewing | resolved | dismissed
+  createdAt   DateTime @default(now())
+
+  @@index([reportedId])
+  @@index([status, createdAt])
+}
+
+model Block {
+  id        String   @id @default(cuid())
+  blockerId String
+  blocker   User     @relation("Blocker", fields: [blockerId], references: [id])
+  blockedId String
+  blocked   User     @relation("Blocked", fields: [blockedId], references: [id])
+  createdAt DateTime @default(now())
+
+  // A blocker can only block the same user once.
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
 }
 
 model Notification {

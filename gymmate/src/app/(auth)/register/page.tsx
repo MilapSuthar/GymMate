@@ -13,16 +13,34 @@ import { Label } from "@/components/ui/label";
 import { useAuth, AuthApiError } from "@/context/AuthContext";
 import SocialLoginButtons from "@/components/social-login-buttons";
 
+const MIN_AGE = 18;
+
+function ageFromIsoDate(iso: string): number {
+  const dob = new Date(iso);
+  const now = new Date();
+  let years = now.getFullYear() - dob.getFullYear();
+  const m = now.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) years--;
+  return years;
+}
+
 const schema = z
   .object({
     name: z.string().trim().min(1, "Name is required").max(100),
     email: z.string().trim().email("Enter a valid email"),
     password: z.string().min(8, "Password must be at least 8 characters"),
     confirm: z.string().min(1, "Please confirm your password"),
+    dateOfBirth: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Enter your date of birth"),
   })
   .refine((d) => d.password === d.confirm, {
     message: "Passwords do not match",
     path: ["confirm"],
+  })
+  .refine((d) => ageFromIsoDate(d.dateOfBirth) >= MIN_AGE, {
+    message: `You must be at least ${MIN_AGE} to use GymMate`,
+    path: ["dateOfBirth"],
   });
 type Form = z.infer<typeof schema>;
 
@@ -39,7 +57,7 @@ export default function RegisterPage() {
   async function onSubmit(values: Form) {
     setSubmitError(null);
     try {
-      await doRegister(values.name, values.email, values.password);
+      await doRegister(values.name, values.email, values.password, values.dateOfBirth);
       router.replace("/");
     } catch (err) {
       const msg =
@@ -47,6 +65,15 @@ export default function RegisterPage() {
       setSubmitError(msg);
     }
   }
+
+  // Max-allowable DOB = today minus 18 years. The browser then disables
+  // picking a more recent date in the native date picker, which also gives
+  // us a UX hint long before the form is submitted.
+  const maxDob = (() => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - MIN_AGE);
+    return d.toISOString().split("T")[0];
+  })();
 
   return (
     <div>
@@ -109,6 +136,24 @@ export default function RegisterPage() {
           />
           {errors.confirm && (
             <p className="text-xs text-destructive">{errors.confirm.message}</p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="dateOfBirth">Date of birth</Label>
+          <Input
+            id="dateOfBirth"
+            type="date"
+            max={maxDob}
+            autoComplete="bday"
+            aria-invalid={!!errors.dateOfBirth}
+            {...register("dateOfBirth")}
+          />
+          <p className="text-xs text-muted-foreground">
+            You must be {MIN_AGE} or older to use GymMate.
+          </p>
+          {errors.dateOfBirth && (
+            <p className="text-xs text-destructive">{errors.dateOfBirth.message}</p>
           )}
         </div>
 

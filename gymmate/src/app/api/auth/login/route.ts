@@ -4,8 +4,16 @@ import { verifyPassword } from "@/lib/auth";
 import { issueTokenPair } from "@/lib/jwt";
 import { parseJson, loginSchema } from "@/lib/validation";
 import { setRefreshCookie } from "@/lib/cookies";
+import { enforceRateLimit, clientIp } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
+  // Brute-force guard: cap password attempts per source IP.
+  const limited = await enforceRateLimit("auth:login", clientIp(req), {
+    limit: 10,
+    windowSeconds: 300,
+  });
+  if (limited) return limited;
+
   const parsed = await parseJson(req, loginSchema);
   if (parsed.error) return parsed.error;
   const { email, password } = parsed.data;

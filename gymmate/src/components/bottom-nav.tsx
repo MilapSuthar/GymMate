@@ -14,7 +14,7 @@ const tabs = [
   { href: "/profile", label: "Profile", icon: User },
 ];
 
-const HIDDEN_ON = ["/login", "/register"];
+const HIDDEN_ON = ["/login", "/register", "/onboarding"];
 
 export default function BottomNav() {
   const pathname = usePathname();

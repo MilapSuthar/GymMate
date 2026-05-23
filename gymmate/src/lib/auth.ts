@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAccessToken, AccessTokenPayload } from "./jwt";
+import { rateLimit, tooManyRequests, type RateLimitRule } from "./rate-limit";
 
 export async function hashPassword(plain: string): Promise<string> {
   return bcrypt.hash(plain, 12);
@@ -39,22 +40,46 @@ export function getAuthFromRequest(req: NextRequest): AccessTokenPayload {
   }
 }
 
+interface WithAuthOptions {
+  /**
+   * When set, the handler is rate limited per authenticated user. `name`
+   * scopes the counter so different endpoints don't share a bucket.
+   */
+  rateLimit?: RateLimitRule & { name: string };
+}
+
 /**
  * Wrapper for protected route handlers. Validates JWT and passes user payload.
  * Use it like: export const GET = withAuth(async (req, user) => { ... });
+ *
+ * Pass `{ rateLimit }` to throttle a write endpoint per user:
+ *   export const POST = withAuth(handler, {
+ *     rateLimit: { name: "swipe", limit: 120, windowSeconds: 60 },
+ *   });
  */
 export function withAuth<T = unknown>(
-  handler: (req: NextRequest, user: AccessTokenPayload, ctx: T) => Promise<Response>
+  handler: (req: NextRequest, user: AccessTokenPayload, ctx: T) => Promise<Response>,
+  options?: WithAuthOptions
 ) {
   return async (req: NextRequest, ctx: T): Promise<Response> => {
+    // Auth extraction is synchronous — its throws are the only ones this
+    // try/catch is meant to map. Handler errors deliberately propagate.
+    let user: AccessTokenPayload;
     try {
-      const user = getAuthFromRequest(req);
-      return handler(req, user, ctx);
+      user = getAuthFromRequest(req);
     } catch (err) {
       if (err instanceof AuthError) {
         return NextResponse.json({ error: err.message }, { status: err.status });
       }
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    if (options?.rateLimit) {
+      const { name, ...rule } = options.rateLimit;
+      const result = await rateLimit(name, `user:${user.sub}`, rule);
+      if (!result.allowed) return tooManyRequests(result);
+    }
+
+    return handler(req, user, ctx);
   };
 }

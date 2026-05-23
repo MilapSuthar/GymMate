@@ -6,6 +6,7 @@ import {
   issueTokenPair,
 } from "@/lib/jwt";
 import { REFRESH_COOKIE, setRefreshCookie, clearRefreshCookie } from "@/lib/cookies";
+import { enforceRateLimit, clientIp } from "@/lib/rate-limit";
 
 // 401 helper that also clears the stale refresh cookie. Without this, a stale
 // cookie keeps tricking middleware into letting requests through even though
@@ -18,6 +19,13 @@ function failAndClearCookie(message: string) {
 }
 
 export async function POST(req: NextRequest) {
+  // Cap refresh churn per source IP — a fast path, but not one to hammer.
+  const limited = await enforceRateLimit("auth:refresh", clientIp(req), {
+    limit: 30,
+    windowSeconds: 300,
+  });
+  if (limited) return limited;
+
   // Read from httpOnly cookie first (browser flow), fall back to JSON body (CLI / mobile clients).
   const cookieToken = req.cookies.get(REFRESH_COOKIE)?.value;
   let refreshToken = cookieToken;

@@ -5,6 +5,7 @@ import { verifyFirebaseIdToken } from "@/lib/firebase-admin";
 import { issueTokenPair } from "@/lib/jwt";
 import { parseJson } from "@/lib/validation";
 import { setRefreshCookie } from "@/lib/cookies";
+import { enforceRateLimit, clientIp } from "@/lib/rate-limit";
 
 const schema = z.object({
   idToken: z.string().min(1, "idToken is required"),
@@ -24,6 +25,13 @@ const schema = z.object({
  *      so users don't end up with two accounts under one email
  */
 export async function POST(req: NextRequest) {
+  // Guard the OAuth exchange against token-stuffing per source IP.
+  const limited = await enforceRateLimit("auth:firebase", clientIp(req), {
+    limit: 20,
+    windowSeconds: 300,
+  });
+  if (limited) return limited;
+
   const parsed = await parseJson(req, schema);
   if (parsed.error) return parsed.error;
   const { idToken } = parsed.data;

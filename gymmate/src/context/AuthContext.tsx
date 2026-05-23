@@ -16,7 +16,12 @@ interface AuthContextValue {
   // accessToken lives only in memory (lost on reload — silent refresh restores it)
   accessToken: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (
+    name: string,
+    email: string,
+    password: string,
+    dateOfBirth: string
+  ) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signInWithApple: () => Promise<void>;
   logout: () => Promise<void>;
@@ -113,12 +118,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const register = useCallback(
-    async (name: string, email: string, password: string) => {
+    async (name: string, email: string, password: string, dateOfBirth: string) => {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "content-type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, password, dateOfBirth }),
       });
       if (!res.ok) throw new AuthApiError(res.status, await readError(res));
       const data = await res.json();

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Pencil, Dumbbell, MapPin, Loader2 } from "lucide-react";
+import { Pencil, Dumbbell, MapPin, Loader2, Briefcase, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
 
@@ -145,6 +145,31 @@ export default function ProfilePage() {
           </div>
         </section>
       )}
+
+      {/* Coaching entry point. This is the ONLY discoverable route into the
+          trainer flow — /trainer/dashboard self-redirects to /become-trainer
+          for users who don't have a trainer profile yet, so a single link
+          serves both new and existing trainers. */}
+      <section className="mt-6">
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+          Coaching
+        </h3>
+        <Link
+          href="/trainer/dashboard"
+          className="flex items-center gap-3 rounded-xl p-3 border border-border bg-card hover:border-primary/40 transition-colors"
+        >
+          <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+            <Briefcase size={16} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold">Train clients on GymMate</p>
+            <p className="text-xs text-muted-foreground">
+              Offer paid sessions or manage your bookings
+            </p>
+          </div>
+          <ChevronRight size={16} className="text-muted-foreground shrink-0" />
+        </Link>
+      </section>
     </div>
   );
 }

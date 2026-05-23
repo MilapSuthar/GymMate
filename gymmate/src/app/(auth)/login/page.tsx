@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -19,8 +19,31 @@ const schema = z.object({
 });
 type Form = z.infer<typeof schema>;
 
+/**
+ * Resolve the post-login destination from the `?next=` param. We ONLY honour
+ * same-origin relative paths — a value must start with a single "/" (not "//",
+ * which the browser treats as protocol-relative). This blocks the classic
+ * open-redirect where an attacker crafts /login?next=//evil.com.
+ */
+function safeNext(raw: string | null): string {
+  if (!raw) return "/";
+  if (!raw.startsWith("/") || raw.startsWith("//")) return "/";
+  return raw;
+}
+
+// useSearchParams must sit inside a Suspense boundary in the App Router.
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = safeNext(searchParams.get("next"));
   const { login } = useAuth();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const {
@@ -33,7 +56,7 @@ export default function LoginPage() {
     setSubmitError(null);
     try {
       await login(values.email, values.password);
-      router.replace("/");
+      router.replace(next);
     } catch (err) {
       const msg =
         err instanceof AuthApiError ? err.message : "Something went wrong. Please try again.";
@@ -97,7 +120,7 @@ export default function LoginPage() {
       </form>
 
       <div className="mt-4">
-        <SocialLoginButtons nextHref="/" />
+        <SocialLoginButtons nextHref={next} />
       </div>
 
       <p className="text-sm text-muted-foreground text-center mt-6">

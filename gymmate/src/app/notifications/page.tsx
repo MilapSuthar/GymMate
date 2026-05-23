@@ -38,8 +38,13 @@ function timeAgo(iso: string) {
 }
 
 function hrefFor(n: Notification): string {
+  // A new message deep-links straight into the conversation; a new match
+  // (no thread yet) lands on the matches list so the user picks who to greet.
+  if (n.type === "new_message" && n.data?.matchId)
+    return `/matches/${n.data.matchId}`;
+  if (n.type === "new_match" && n.data?.matchId)
+    return `/matches/${n.data.matchId}`;
   if (n.type === "new_match") return "/matches";
-  if (n.type === "new_message" && n.data?.matchId) return `/matches`;
   if (n.type === "new_answer" && n.data?.questionId)
     return `/help-board/${n.data.questionId}`;
   return "/notifications";
@@ -68,6 +73,9 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     if (authLoading || !user) return;
+    // Canonical fetch-on-mount; the React 19 rule flags the indirect setState
+    // inside fetchData. Intentional.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData();
   }, [authLoading, user, fetchData]);
 
@@ -85,6 +93,31 @@ export default function NotificationsPage() {
       toast.error("Failed to mark as read");
     }
   };
+
+  /**
+   * Mark a single notification read when the user opens it. We update local
+   * state optimistically so the dot/highlight clears instantly, then fire the
+   * POST in the background — the click also triggers a <Link> navigation, and
+   * the fetch keeps running even though this component unmounts during the
+   * route change. No-op if the notification is already read.
+   */
+  const markOneRead = useCallback(
+    (n: Notification) => {
+      if (n.read) return;
+      setNotifications((prev) =>
+        prev.map((x) => (x.id === n.id ? { ...x, read: true } : x))
+      );
+      setUnreadCount((c) => Math.max(0, c - 1));
+      authFetch("/api/notifications/read", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ids: [n.id] }),
+      }).catch(() => {
+        // Best-effort. If it fails the next page load re-syncs the true state.
+      });
+    },
+    [authFetch]
+  );
 
   return (
     <div className="px-4 pt-6 pb-4">
@@ -128,6 +161,7 @@ export default function NotificationsPage() {
               <Link
                 key={n.id}
                 href={hrefFor(n)}
+                onClick={() => markOneRead(n)}
                 className={`flex items-start gap-3 rounded-xl p-3 border transition-colors ${
                   n.read
                     ? "bg-card border-border"

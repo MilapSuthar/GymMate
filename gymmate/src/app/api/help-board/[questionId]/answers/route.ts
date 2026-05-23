@@ -68,5 +68,6 @@ export const POST = withAuth<{ params: Promise<{ questionId: string }> }>(
       },
       { status: 201 }
     );
-  }
+  },
+  { rateLimit: { name: "answer", limit: 20, windowSeconds: 60 } }
 );

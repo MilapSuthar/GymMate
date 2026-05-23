@@ -88,4 +88,6 @@ export const POST = withAuth(async (req, payload) => {
     },
     { status: 201 }
   );
+}, {
+  rateLimit: { name: "question", limit: 10, windowSeconds: 60 },
 });

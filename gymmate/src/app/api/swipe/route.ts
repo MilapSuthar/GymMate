@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { withAuth } from "@/lib/auth";
 import { parseJson } from "@/lib/validation";
 import { sendNotification } from "@/lib/notifications";
+import { blockExistsBetween } from "@/lib/block";
 
 const swipeSchema = z.object({
   swipeeId: z.string().min(1),
@@ -38,6 +39,14 @@ export const POST = withAuth(async (req, payload) => {
   });
   if (!swipee) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
+  // If either side has blocked the other, a match must be impossible. Rather
+  // than erroring (which would make the frontend bounce the stale card back
+  // into the deck), we silently no-op: record nothing and report no match, so
+  // the card just clears and the two users can never connect.
+  if (await blockExistsBetween(swiperId, swipeeId)) {
+    return NextResponse.json({ isMatch: false });
   }
 
   const liked = direction === "like";
@@ -111,4 +120,6 @@ export const POST = withAuth(async (req, payload) => {
       },
     },
   });
+}, {
+  rateLimit: { name: "swipe", limit: 120, windowSeconds: 60 },
 });
