@@ -2,16 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Heart, MessageCircle, HelpCircle, Users, Apple, Dumbbell, User } from "lucide-react";
+import { Heart, Users, MessageCircle, User } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
+// V1 nav: Match (the wedge) → Community (group + meetups) → Messages → Profile.
+// Trainers, Nutrition, Exercise, and the old Help board are hidden from the
+// nav for V1 but their routes still exist — we'll resurrect them in V2 only
+// once the buddy-finding loop has demand-validated. The Community tab still
+// points at /help-board until M5 renames the route to /community.
 const tabs = [
   { href: "/", label: "Match", icon: Heart },
-  { href: "/matches", label: "Chats", icon: MessageCircle },
-  { href: "/help-board", label: "Help", icon: HelpCircle },
-  { href: "/trainers", label: "Trainers", icon: Users },
-  { href: "/nutrition", label: "Nutrition", icon: Apple },
-  { href: "/exercise", label: "Exercise", icon: Dumbbell },
+  { href: "/help-board", label: "Community", icon: Users },
+  { href: "/matches", label: "Messages", icon: MessageCircle },
   { href: "/profile", label: "Profile", icon: User },
 ];
 
