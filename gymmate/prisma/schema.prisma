@@ -92,6 +92,10 @@ model User {
   reportsReceived Report[] @relation("Reported")
   blocksSent      Block[]  @relation("Blocker")
   blocksReceived  Block[]  @relation("Blocked")
+
+  // Community — Meetups + RSVPs
+  meetupsHosted Meetup[]     @relation("MeetupHost")
+  meetupRsvps   MeetupRsvp[] @relation("MeetupRsvps")
 }
 
 // =====================
@@ -151,6 +155,7 @@ model Gym {
   longitude Float?
   users     User[]
   trainers  TrainerProfile[]
+  meetups   Meetup[]
 }
 
 // =====================
@@ -381,4 +386,64 @@ model UserPhoto {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+// =====================
+// COMMUNITY — Meetups + RSVPs
+// =====================
+// A Meetup is a time-bound event a host posts ("Powerlifting Saturday 10am
+// at Goodlife Kanata, looking for 3 people"). RSVPs are the "tick" — the
+// commitment device that turns a feed into a coordination tool. After the
+// scheduled time passes, attendees self-mark `checkedIn = true`, which
+// drives the "you worked out with N people this week" stat on Profile.
+model Meetup {
+  id           String       @id @default(cuid())
+  hostId       String
+  host         User         @relation("MeetupHost", fields: [hostId], references: [id])
+  title        String
+  description  String?
+  // Sport / training focus tag. Free text so the community can invent
+  // categories; the create form will offer a canonical short list
+  // (powerlifting, cardio, running, yoga, mobility, calisthenics, etc.).
+  sportTag     String
+  // Free-text location ("Goodlife Fitness Kanata") plus optional structured
+  // coords for distance ranking later. `gymId` is a soft link to a Gym row
+  // when the host picked one from the list rather than typing it freehand.
+  location     String
+  gymId        String?
+  gym          Gym?         @relation(fields: [gymId], references: [id])
+  latitude     Float?
+  longitude    Float?
+  scheduledAt  DateTime
+  durationMins Int          @default(60)
+  // Null = no cap. Capacity counts include the host's own RSVP.
+  capacity     Int?
+  // "open" | "cancelled" | "completed"
+  status       String       @default("open")
+  rsvps        MeetupRsvp[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([scheduledAt])
+  @@index([hostId, scheduledAt])
+  @@index([sportTag, scheduledAt])
+}
+
+model MeetupRsvp {
+  id        String   @id @default(cuid())
+  meetupId  String
+  meetup    Meetup   @relation(fields: [meetupId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation("MeetupRsvps", fields: [userId], references: [id])
+  // "going" | "cancelled". A user can RSVP, drop, then RSVP again — we keep
+  // the row and toggle status, so we don't lose attendance history.
+  status    String   @default("going")
+  // Set true post-event when the attendee marks themselves as having shown
+  // up. Drives the weekly co-attended sessions stat.
+  checkedIn Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([meetupId, userId])
+  @@index([userId, checkedIn])
 }
