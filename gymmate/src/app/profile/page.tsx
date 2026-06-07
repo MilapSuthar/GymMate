@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import ProfileSessions from "@/components/profile-sessions";
 import { useAuth } from "@/context/AuthContext";
 
 interface Profile {
@@ -154,6 +155,9 @@ export default function ProfilePage() {
           </div>
         </section>
       )}
+
+      {/* V1 fitness pillar: weekly co-attendance + check-in surface. */}
+      <ProfileSessions />
 
       {/* Coaching entry point. This is the ONLY discoverable route into the
           trainer flow — /trainer/dashboard self-redirects to /become-trainer
