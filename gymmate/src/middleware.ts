@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 // anything missing here is silently reachable while logged out.
 const PROTECTED_PATHS = [
   "/",
+  "/community",
   "/help-board",
   "/trainers",
   "/nutrition",
