@@ -1,12 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Users,
   Calendar,
   MapPin,
   Plus,
   Sparkles,
+  Check,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +41,7 @@ export default function CommunityPage() {
   const [meetups, setMeetups] = useState<Meetup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pendingId, setPendingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -64,6 +68,69 @@ export default function CommunityPage() {
 
   const isLoading = loading && !!user;
 
+  /**
+   * Toggle the viewer's RSVP. Optimistic — we flip the card immediately and
+   * roll back on a non-2xx response. Host cards are never passed through here
+   * (no Going button rendered for them).
+   */
+  const toggleRsvp = useCallback(
+    async (m: Meetup, going: boolean) => {
+      if (pendingId || m.isMine) return;
+      setPendingId(m.id);
+      // Optimistically flip the card.
+      setMeetups((prev) =>
+        prev.map((x) =>
+          x.id === m.id
+            ? {
+                ...x,
+                hasRsvped: going,
+                rsvpCount: x.rsvpCount + (going ? 1 : -1),
+              }
+            : x
+        )
+      );
+      try {
+        const res = await authFetch(`/api/meetups/${m.id}/rsvp`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ going }),
+        });
+        if (!res.ok) {
+          // Roll back.
+          setMeetups((prev) =>
+            prev.map((x) =>
+              x.id === m.id
+                ? {
+                    ...x,
+                    hasRsvped: !going,
+                    rsvpCount: x.rsvpCount + (going ? -1 : 1),
+                  }
+                : x
+            )
+          );
+          const data = await res.json().catch(() => null);
+          const { toast } = await import("sonner");
+          toast.error(data?.error || "Couldn't update your RSVP");
+        }
+      } catch {
+        setMeetups((prev) =>
+          prev.map((x) =>
+            x.id === m.id
+              ? {
+                  ...x,
+                  hasRsvped: !going,
+                  rsvpCount: x.rsvpCount + (going ? -1 : 1),
+                }
+              : x
+          )
+        );
+      } finally {
+        setPendingId(null);
+      }
+    },
+    [authFetch, pendingId]
+  );
+
   return (
     <div className="px-4 pt-6 pb-4">
       {/* Header */}
@@ -74,18 +141,13 @@ export default function CommunityPage() {
             Join a session, or post one of your own
           </p>
         </div>
-        {/* The Post button is a placeholder until M6 ships the create form.
-            Disabled visual so users discover the feature exists, but can't
-            click into a half-built flow. */}
-        <button
-          disabled
-          aria-disabled
-          title="Coming next milestone"
-          className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold opacity-50 cursor-not-allowed shrink-0"
+        <Link
+          href="/community/new"
+          className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold shrink-0 hover:opacity-90 transition-opacity shadow-md shadow-primary/20"
         >
           <Plus size={16} />
           Post
-        </button>
+        </Link>
       </div>
 
       <div className="mt-5">
@@ -110,7 +172,12 @@ export default function CommunityPage() {
         ) : (
           <div className="flex flex-col gap-3">
             {meetups.map((m) => (
-              <MeetupCard key={m.id} m={m} />
+              <MeetupCard
+                key={m.id}
+                m={m}
+                pending={pendingId === m.id}
+                onRsvp={toggleRsvp}
+              />
             ))}
           </div>
         )}
@@ -126,15 +193,29 @@ function EmptyState() {
         <Sparkles size={24} />
       </div>
       <h3 className="text-lg font-semibold mb-1">No upcoming sessions yet</h3>
-      <p className="text-sm text-muted-foreground max-w-xs">
-        Be the first to post a meetup — the Post button goes live in the next
-        milestone.
+      <p className="text-sm text-muted-foreground max-w-xs mb-4">
+        Be the first to post one. Hit Post above and pick a time and place.
       </p>
+      <Link
+        href="/community/new"
+        className="inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+      >
+        <Plus size={14} />
+        Post a meetup
+      </Link>
     </div>
   );
 }
 
-function MeetupCard({ m }: { m: Meetup }) {
+function MeetupCard({
+  m,
+  pending,
+  onRsvp,
+}: {
+  m: Meetup;
+  pending: boolean;
+  onRsvp: (m: Meetup, going: boolean) => void;
+}) {
   const sched = new Date(m.scheduledAt);
   const dateStr = sched.toLocaleDateString(undefined, {
     weekday: "short",
@@ -148,6 +229,8 @@ function MeetupCard({ m }: { m: Meetup }) {
   const capacityLabel = m.capacity
     ? `${m.rsvpCount}/${m.capacity} going`
     : `${m.rsvpCount} going`;
+  const isFull =
+    m.capacity != null && m.rsvpCount >= m.capacity && !m.hasRsvped;
 
   return (
     <div
@@ -188,9 +271,35 @@ function MeetupCard({ m }: { m: Meetup }) {
           <p className="text-[11px] text-muted-foreground mt-2">
             Hosted by {m.host.name}
             {m.isMine ? " (you)" : ""}
-            {m.hasRsvped && !m.isMine ? " · you're going" : ""}
           </p>
         </div>
+
+        {/* RSVP action — host doesn't get one (their RSVP is implicit). */}
+        {!m.isMine && (
+          <button
+            disabled={pending || (isFull && !m.hasRsvped)}
+            onClick={() => onRsvp(m, !m.hasRsvped)}
+            data-testid={`rsvp-${m.id}`}
+            className={`shrink-0 inline-flex items-center gap-1 h-8 px-3 rounded-full text-xs font-semibold transition-colors disabled:opacity-50 ${
+              m.hasRsvped
+                ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/25"
+                : "bg-primary text-primary-foreground hover:opacity-90"
+            }`}
+          >
+            {pending ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : m.hasRsvped ? (
+              <>
+                <Check size={12} />
+                Going
+              </>
+            ) : isFull ? (
+              "Full"
+            ) : (
+              "Join"
+            )}
+          </button>
+        )}
       </div>
     </div>
   );
