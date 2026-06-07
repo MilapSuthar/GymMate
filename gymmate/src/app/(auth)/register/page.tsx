@@ -81,8 +81,10 @@ export default function RegisterPage() {
         <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center mb-3">
           <Dumbbell size={24} className="text-primary-foreground" />
         </div>
-        <h1 className="text-2xl font-bold">Create your account</h1>
-        <p className="text-muted-foreground text-sm">Join the GymMate community</p>
+        <h1 className="text-2xl font-bold">Find your gym partner</h1>
+        <p className="text-muted-foreground text-sm">
+          Match with lifters near you. Pick a time, show up, stay accountable.
+        </p>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>

@@ -304,7 +304,7 @@ export default function MatchPage() {
             </button>
           )}
         </div>
-        <p className="text-muted-foreground text-sm mb-4">Gym-goers near you</p>
+        <p className="text-muted-foreground text-sm mb-4">Find someone to lift with</p>
 
         {/* "Likes You" inbox entry — only shown when there's something to see,
             so it always lands as a reward rather than an empty placeholder. */}

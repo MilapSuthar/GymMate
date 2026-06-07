@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# GymMate — Next.js app
 
-## Getting Started
+The application source for GymMate. See [the top-level README](../README.md)
+for the product overview.
 
-First, run the development server:
+## Stack
+
+- **Next.js 16** (App Router, Turbopack)
+- **React 19**, **TypeScript**
+- **Prisma 6** + **SQLite** in dev (`prisma/dev.db`)
+- **Firebase** for OAuth (Google, Apple) + **JWT** for our own sessions
+- **Tailwind 4** + **shadcn/ui** + **lucide-react**
+- **ioredis** for rate-limit + refresh-token storage (memory fallback in dev)
+
+## Local setup
 
 ```bash
+# Install dependencies
+npm install
+
+# Set up environment (copy and fill in)
+cp .env.example .env
+
+# Apply migrations + regenerate the Prisma client
+npx prisma migrate dev
+npx prisma generate
+
+# Start the dev server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The app boots at [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+> **Important:** if you change the Prisma schema or pull a branch that did,
+> always re-run `npx prisma generate` before `npm run dev`, or you will see
+> "unknown field" errors at runtime. If a route 500s with a query error,
+> regenerating the client is almost always the fix.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Scripts
 
-## Learn More
+| Command                  | What it does                          |
+| ------------------------ | ------------------------------------- |
+| `npm run dev`            | Turbopack dev server with HMR         |
+| `npm run build`          | Production build                      |
+| `npm run start`          | Run a built app                       |
+| `npm run lint`           | ESLint                                |
+| `npx prisma studio`      | Visual DB browser                     |
+| `npx prisma migrate dev` | Apply pending migrations + generate   |
 
-To learn more about Next.js, take a look at the following resources:
+## Folder layout
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+src/
+├── app/                 routes (App Router)
+│   ├── (auth)/          login + register
+│   ├── api/             route handlers
+│   ├── matches/         match list + chat
+│   ├── likes/           "Likes You" inbox
+│   └── onboarding/      mandatory onboarding funnel
+├── components/          shared components (top-bar, bottom-nav, ui)
+├── context/             AuthContext provider
+├── lib/                 db, auth, rate-limit, profile helpers, etc.
+└── middleware.ts        route protection (cookie-presence gate)
+prisma/
+├── schema.prisma        canonical schema
+└── migrations/          versioned migration history
+```

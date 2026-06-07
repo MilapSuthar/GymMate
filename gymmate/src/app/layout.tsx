@@ -9,8 +9,9 @@ import { Toaster } from "@/components/ui/sonner";
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
 
 export const metadata: Metadata = {
-  title: "GymMate",
-  description: "Connect with gym-goers, find trainers, and track your fitness.",
+  title: "GymMate — Find a gym partner near you",
+  description:
+    "Find a gym partner near you. Match by gym, schedule overlap, and training goals — then meet up and stay accountable.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
