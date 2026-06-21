@@ -14,7 +14,8 @@ import {
   ChevronRight,
   RotateCcw,
 } from "lucide-react";
-import { isOnboarded } from "@/lib/profile";
+import { isOnboarded, LOOKING_FOR, LOOKING_FOR_LABELS } from "@/lib/profile";
+import VerifiedBadge from "@/components/verified-badge";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -43,6 +44,7 @@ interface DiscoverUser {
   distance: number | null;
   /** Shared (day, slot) cells with the viewer. 0 = no overlap or no schedule. */
   overlap: number;
+  isVerified: boolean;
 }
 
 interface MatchedUser {
@@ -79,6 +81,9 @@ export default function MatchPage() {
   // Schedule-overlap filter. `null` = no constraint; any positive integer
   // means "only show people who share at least N slots with me".
   const [minOverlap, setMinOverlap] = useState<number | null>(null);
+  // Match-by-intent filter. Empty array = no constraint; any tags selected
+  // narrow the deck to candidates whose lookingFor intersects ours.
+  const [lookingForFilter, setLookingForFilter] = useState<string[]>([]);
   const [reportTarget, setReportTarget] = useState<DiscoverUser | null>(null);
   // Count of people who liked the viewer but haven't been swiped back on —
   // powers the "Likes You" entry point at the top of the deck.
@@ -95,13 +100,20 @@ export default function MatchPage() {
   const onboardingCheckedRef = useRef(false);
 
   const fetchDiscover = useCallback(
-    async (km: number | null, overlap: number | null) => {
+    async (
+      km: number | null,
+      overlap: number | null,
+      lookingFor: string[]
+    ) => {
       setLoading(true);
       setError(null);
       try {
         const params = new URLSearchParams();
         if (km != null) params.set("maxDistance", String(km));
         if (overlap != null) params.set("minOverlap", String(overlap));
+        if (lookingFor.length > 0) {
+          params.set("lookingFor", lookingFor.join(","));
+        }
         const qs = params.toString();
         const res = await authFetch(`/api/discover${qs ? `?${qs}` : ""}`);
         if (!res.ok) throw new Error("Failed to load matches");
@@ -165,7 +177,7 @@ export default function MatchPage() {
             }),
           });
           // Refetch so distances populate on the visible cards
-          fetchDiscover(maxDistance, minOverlap);
+          fetchDiscover(maxDistance, minOverlap, lookingForFilter);
         } catch {
           // Silent — discover still works without coords
         }
@@ -175,7 +187,7 @@ export default function MatchPage() {
       },
       { timeout: 8000, maximumAge: 5 * 60 * 1000 }
     );
-  }, [authLoading, user, authFetch, fetchDiscover, maxDistance, minOverlap]);
+  }, [authLoading, user, authFetch, fetchDiscover, maxDistance, minOverlap, lookingForFilter]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -185,8 +197,8 @@ export default function MatchPage() {
     // before its network round-trip). This is the canonical "fetch on prop
     // change" pattern, so the disable is intentional.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchDiscover(maxDistance, minOverlap);
-  }, [authLoading, user, fetchDiscover, maxDistance, minOverlap]);
+    fetchDiscover(maxDistance, minOverlap, lookingForFilter);
+  }, [authLoading, user, fetchDiscover, maxDistance, minOverlap, lookingForFilter]);
 
   // Fetch the "likes you" count so the deck can surface the inbox entry.
   // Best-effort: the entry simply stays hidden if this fails. setState happens
@@ -269,7 +281,7 @@ export default function MatchPage() {
           ...prev.filter((u) => u.id !== lastSwiped.id),
         ]);
       } else {
-        fetchDiscover(maxDistance, minOverlap);
+        fetchDiscover(maxDistance, minOverlap, lookingForFilter);
       }
       // The rewind may have dissolved a just-formed match — clear the modal.
       setMatchedWith(null);
@@ -280,7 +292,7 @@ export default function MatchPage() {
     } finally {
       setRewinding(false);
     }
-  }, [authFetch, rewinding, lastSwiped, fetchDiscover, maxDistance, minOverlap]);
+  }, [authFetch, rewinding, lastSwiped, fetchDiscover, maxDistance, minOverlap, lookingForFilter]);
 
   const top = users[0];
 
@@ -353,6 +365,33 @@ export default function MatchPage() {
           ))}
         </div>
 
+        {/* Looking-for / intent filter chip row — narrows the deck to people
+            whose stated needs overlap yours. Empty selection = no filter. */}
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-2 scrollbar-none">
+          {LOOKING_FOR.map((t) => {
+            const active = lookingForFilter.includes(t);
+            return (
+              <button
+                key={t}
+                onClick={() =>
+                  setLookingForFilter((prev) =>
+                    prev.includes(t)
+                      ? prev.filter((x) => x !== t)
+                      : [...prev, t]
+                  )
+                }
+                className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                  active
+                    ? "bg-sky-500/20 text-sky-300 border border-sky-500/40"
+                    : "bg-secondary text-muted-foreground hover:text-foreground border border-transparent"
+                }`}
+              >
+                {LOOKING_FOR_LABELS[t]}
+              </button>
+            );
+          })}
+        </div>
+
         {/* Distance filter chip row */}
         <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-none">
           <button
@@ -385,9 +424,9 @@ export default function MatchPage() {
           {isLoading || authLoading ? (
             <SkeletonCard />
           ) : error ? (
-            <ErrorState message={error} onRetry={() => fetchDiscover(maxDistance, minOverlap)} />
+            <ErrorState message={error} onRetry={() => fetchDiscover(maxDistance, minOverlap, lookingForFilter)} />
           ) : !top ? (
-            <EmptyState onRefresh={() => fetchDiscover(maxDistance, minOverlap)} />
+            <EmptyState onRefresh={() => fetchDiscover(maxDistance, minOverlap, lookingForFilter)} />
           ) : (
             <ProfileCard
               user={top}
@@ -706,9 +745,12 @@ function ProfileCard({
         </button>
 
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-5">
-          <h2 className="text-xl font-bold text-white">
-            {user.name}
-            {user.age ? `, ${user.age}` : ""}
+          <h2 className="text-xl font-bold text-white flex items-center gap-1.5">
+            <span>
+              {user.name}
+              {user.age ? `, ${user.age}` : ""}
+            </span>
+            {user.isVerified && <VerifiedBadge size={16} />}
           </h2>
           {(user.gymName || user.distance != null) && (
             <div className="flex items-center gap-1 text-white/70 text-sm mt-0.5">

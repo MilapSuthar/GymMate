@@ -18,10 +18,10 @@ export const GET = withAuth<{ params: Promise<{ matchId: string }> }>(
       where: { id: matchId },
       include: {
         userA: {
-          select: { id: true, name: true, displayName: true, photoUrl: true },
+          select: { id: true, name: true, displayName: true, photoUrl: true, isVerified: true },
         },
         userB: {
-          select: { id: true, name: true, displayName: true, photoUrl: true },
+          select: { id: true, name: true, displayName: true, photoUrl: true, isVerified: true },
         },
       },
     });
@@ -50,6 +50,7 @@ export const GET = withAuth<{ params: Promise<{ matchId: string }> }>(
         id: other.id,
         name: other.displayName || other.name,
         photoUrl: other.photoUrl,
+        isVerified: other.isVerified,
       },
     });
   }

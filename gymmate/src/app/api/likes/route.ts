@@ -33,6 +33,7 @@ export const GET = withAuth(async (_req, payload) => {
             fitnessGoals: true,
             goals: true,
             experienceLevel: true,
+            isVerified: true,
             photos: {
               orderBy: { position: "asc" },
               take: 6,
@@ -73,6 +74,7 @@ export const GET = withAuth(async (_req, payload) => {
         photos,
         fitnessGoals: parseGoals(u.fitnessGoals ?? u.goals),
         experienceLevel: u.experienceLevel,
+        isVerified: u.isVerified,
         likedAt: s.createdAt,
       };
     });

@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { withAuth } from "@/lib/auth";
-import { parseGoals, scheduleOverlap } from "@/lib/profile";
+import {
+  LOOKING_FOR,
+  parseGoals,
+  parseLookingFor,
+  scheduleOverlap,
+} from "@/lib/profile";
 import { haversineKm } from "@/lib/geo";
 
 const DEFAULT_LIMIT = 20;
@@ -69,6 +74,18 @@ export const GET = withAuth(async (req, payload) => {
   const minOverlap = Number.isFinite(minOverlapParam) && minOverlapParam > 0
     ? minOverlapParam
     : null;
+
+  // Match-by-intent filter. Comma-separated tag list ?lookingFor=spotter,partner
+  // — we only surface candidates whose own lookingFor set intersects the
+  // viewer's selection. Tokens not in the canonical set are ignored so a
+  // malformed param can't widen results past what the schema permits.
+  const lookingForRaw = url.searchParams.get("lookingFor") || "";
+  const lookingForFilter = new Set<string>(
+    lookingForRaw
+      .split(",")
+      .map((s) => s.trim())
+      .filter((t) => (LOOKING_FOR as readonly string[]).includes(t))
+  );
 
   const [viewer, swipes, matchesA, matchesB, blocksOut, blocksIn] = await Promise.all([
     prisma.user.findUnique({
@@ -184,6 +201,13 @@ export const GET = withAuth(async (req, payload) => {
     enriched = enriched.filter((e) => e.overlap >= minOverlap);
   }
 
+  if (lookingForFilter.size > 0) {
+    enriched = enriched.filter(({ user: u }) => {
+      const candidateTags = parseLookingFor(u.lookingFor);
+      return candidateTags.some((t) => lookingForFilter.has(t));
+    });
+  }
+
   // Rank by schedule overlap (desc), with createdAt-newest as the tiebreak.
   // The original SQL ORDER BY already sorted by createdAt desc, but we re-sort
   // in-memory because overlap is computed post-fetch. With fetchSize = 200 this
@@ -211,7 +235,9 @@ export const GET = withAuth(async (req, payload) => {
         bio: u.bio,
         gymName: u.gymName,
         fitnessGoals: parseGoals(u.fitnessGoals),
+        lookingFor: parseLookingFor(u.lookingFor),
         experienceLevel: u.experienceLevel,
+        isVerified: u.isVerified,
         photoUrl: photoUrls[0] ?? null, // back-compat for older clients
         photos: photoUrls,
         distance: distance != null ? Math.round(distance * 10) / 10 : null,

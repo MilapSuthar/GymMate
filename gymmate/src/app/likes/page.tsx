@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Heart, X, Dumbbell, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import VerifiedBadge from "@/components/verified-badge";
 import { useAuth } from "@/context/AuthContext";
 
 interface LikeUser {
@@ -17,6 +18,7 @@ interface LikeUser {
   photos: string[];
   fitnessGoals: string[];
   experienceLevel: string | null;
+  isVerified: boolean;
   likedAt: string;
 }
 
@@ -177,9 +179,12 @@ export default function LikesPage() {
                   </div>
                 )}
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent p-3">
-                  <h3 className="text-sm font-bold text-white truncate">
-                    {u.name}
-                    {u.age ? `, ${u.age}` : ""}
+                  <h3 className="text-sm font-bold text-white flex items-center gap-1">
+                    <span className="truncate">
+                      {u.name}
+                      {u.age ? `, ${u.age}` : ""}
+                    </span>
+                    {u.isVerified && <VerifiedBadge size={11} />}
                   </h3>
                   {u.gymName && (
                     <p className="text-[11px] text-white/70 truncate">

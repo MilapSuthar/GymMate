@@ -51,10 +51,19 @@ model User {
   // values (7 days × 5 slots). Used by discover to compute overlap-based
   // ranking — the GymMate moat. Empty/null = "unknown" (no overlap signal).
   gymSchedule     String?
+  // Match-by-intent. Comma-separated tokens from a canonical set
+  // ("partner,spotter,class-buddy,accountability") describing what kind of
+  // gym partner the user wants. Discover ranks candidates whose lookingFor
+  // intersects the viewer's — same intent → mutual fit.
+  lookingFor      String?
   // Daily-streak gamification. `streakCount` is the run of consecutive UTC
   // days the user has opened the app; `lastActiveOn` is the last day counted.
   streakCount     Int       @default(0)
   lastActiveOn    DateTime?
+  // Trust signal. `false` until the user completes selfie verification
+  // (V1.2). Rendered as a small sky-blue check pill everywhere their name
+  // appears so the trust mechanic is visible from day one.
+  isVerified      Boolean   @default(false)
   photos          UserPhoto[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

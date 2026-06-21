@@ -23,6 +23,7 @@ const OTHER_USER_SELECT = {
   gymSchedule: true,
   lookingFor: true,
   fitnessGoals: true,
+  isVerified: true,
 };
 
 function intersect<T>(a: T[], b: T[]): T[] {
@@ -180,6 +181,7 @@ export const GET = withAuth(async (_req, payload) => {
           photoUrl: other.photoUrl,
           experienceLevel: other.experienceLevel,
           gymName: other.gymName,
+          isVerified: other.isVerified,
         },
         distanceKm:
           distance != null ? Math.round(distance * 10) / 10 : null,

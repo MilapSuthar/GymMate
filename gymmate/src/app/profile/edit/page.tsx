@@ -18,6 +18,8 @@ import {
   EXPERIENCE_LEVELS,
   FITNESS_GOALS,
   GENDERS,
+  LOOKING_FOR,
+  LOOKING_FOR_LABELS,
   MAX_PHOTOS,
   MAX_USER_AGE,
   MIN_USER_AGE,
@@ -26,6 +28,7 @@ import {
   type ExperienceLevel,
   type FitnessGoal,
   type Gender,
+  type LookingFor,
   type ScheduleToken,
 } from "@/lib/profile";
 
@@ -44,6 +47,7 @@ export default function EditProfilePage() {
   const [gymName, setGymName] = useState("");
   const [age, setAge] = useState<string>("");
   const [goals, setGoals] = useState<FitnessGoal[]>([]);
+  const [lookingFor, setLookingFor] = useState<LookingFor[]>([]);
   const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel | "">("");
   const [photos, setPhotos] = useState<ProfilePhoto[]>([]);
   // Match preferences
@@ -74,6 +78,7 @@ export default function EditProfilePage() {
           setGymName(p.gymName ?? "");
           setAge(p.age ? String(p.age) : "");
           setGoals(p.fitnessGoals ?? []);
+          setLookingFor((p.lookingFor as LookingFor[]) ?? []);
           setExperienceLevel((p.experienceLevel as ExperienceLevel) ?? "");
           setPhotos(p.photos ?? []);
           setGender((p.gender as Gender) ?? "");
@@ -90,6 +95,12 @@ export default function EditProfilePage() {
 
   function toggleGoal(g: FitnessGoal) {
     setGoals((prev) => (prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]));
+  }
+
+  function toggleLookingFor(t: LookingFor) {
+    setLookingFor((prev) =>
+      prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]
+    );
   }
 
   function toggleShowMe(g: Gender) {
@@ -121,6 +132,7 @@ export default function EditProfilePage() {
           gymName: gymName || null,
           age: age ? Number(age) : null,
           fitnessGoals: goals,
+          lookingFor,
           experienceLevel: experienceLevel || null,
           gender: gender || null,
           showMeGenders: showMe,
@@ -298,6 +310,29 @@ export default function EditProfilePage() {
                   }`}
                 >
                   {g.replace("-", " ")}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label>I&apos;m looking for</Label>
+          <div className="flex flex-wrap gap-2">
+            {LOOKING_FOR.map((t) => {
+              const active = lookingFor.includes(t);
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => toggleLookingFor(t)}
+                  className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                    active
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-secondary border-border text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {LOOKING_FOR_LABELS[t]}
                 </button>
               );
             })}

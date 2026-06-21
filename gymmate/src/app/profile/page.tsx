@@ -14,6 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import ProfileSessions from "@/components/profile-sessions";
+import VerifiedBadge from "@/components/verified-badge";
 import { useAuth } from "@/context/AuthContext";
 
 interface Profile {
@@ -26,6 +27,7 @@ interface Profile {
   fitnessGoals: string[];
   experienceLevel: string | null;
   photos: { id: string; url: string; position: number }[];
+  isVerified: boolean;
   email?: string;
 }
 
@@ -92,9 +94,12 @@ export default function ProfilePage() {
             </div>
           )}
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-5">
-            <h2 className="text-xl font-bold text-white">
-              {profile.displayName || profile.name}
-              {profile.age ? <span className="font-normal">, {profile.age}</span> : null}
+            <h2 className="text-xl font-bold text-white flex items-center gap-1.5">
+              <span>
+                {profile.displayName || profile.name}
+                {profile.age ? <span className="font-normal">, {profile.age}</span> : null}
+              </span>
+              {profile.isVerified && <VerifiedBadge size={15} />}
             </h2>
             {profile.gymName && (
               <div className="flex items-center gap-1 text-white/70 text-sm mt-0.5">
@@ -155,6 +160,47 @@ export default function ProfilePage() {
           </div>
         </section>
       )}
+
+      {/* Trust ribbon. Selfie-match verification ships in V1.2; until then,
+          this section explains the badge and provides a placeholder CTA so
+          the mechanic is discoverable from day one. Verified users get a
+          subtler confirmation pill instead of the CTA. */}
+      <section className="mt-6">
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+          Trust
+        </h3>
+        {profile.isVerified ? (
+          <div className="flex items-center gap-2.5 rounded-xl border border-sky-500/30 bg-sky-500/10 p-3">
+            <VerifiedBadge size={20} />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-sky-300">
+                Verified profile
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Your selfie matched your photos. Other lifters can trust this
+                profile is really you.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <button
+            disabled
+            title="Coming in V1.2"
+            className="w-full flex items-center gap-3 rounded-xl p-3 border border-border bg-card text-left opacity-70 cursor-not-allowed"
+          >
+            <div className="w-9 h-9 rounded-lg bg-sky-500/15 text-sky-400 flex items-center justify-center shrink-0">
+              <VerifiedBadge size={18} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold">Verify your profile</p>
+              <p className="text-xs text-muted-foreground">
+                A quick selfie check unlocks the blue badge on every screen.
+                Coming next release.
+              </p>
+            </div>
+          </button>
+        )}
+      </section>
 
       {/* V1 fitness pillar: weekly co-attendance + check-in surface. */}
       <ProfileSessions />

@@ -10,6 +10,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import VerifiedBadge from "@/components/verified-badge";
 import { useAuth } from "@/context/AuthContext";
 
 interface LastMessage {
@@ -28,6 +29,7 @@ interface MatchRow {
     photoUrl: string | null;
     experienceLevel: string | null;
     gymName: string | null;
+    isVerified: boolean;
   };
   distanceKm: number | null;
   overlap: number;
@@ -164,6 +166,7 @@ function MatchCard({ m }: { m: MatchRow }) {
             <span className="font-semibold text-sm truncate">
               {otherUser.name}
             </span>
+            {otherUser.isVerified && <VerifiedBadge size={13} />}
             {otherUser.experienceLevel && (
               <Badge
                 variant="secondary"

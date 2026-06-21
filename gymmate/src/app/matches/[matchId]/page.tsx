@@ -10,6 +10,7 @@ import {
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Send, Dumbbell, Loader2, Ban } from "lucide-react";
+import VerifiedBadge from "@/components/verified-badge";
 import { useAuth } from "@/context/AuthContext";
 
 interface ChatMessage {
@@ -24,6 +25,7 @@ interface OtherUser {
   id: string;
   name: string;
   photoUrl: string | null;
+  isVerified: boolean;
 }
 
 /** How often we re-poll for new messages while the chat is open (ms). */
@@ -189,9 +191,12 @@ export default function ChatPage() {
             <Dumbbell size={16} className="text-muted-foreground" />
           )}
         </div>
-        <span className="font-semibold text-sm truncate">
-          {otherUser?.name ?? "Chat"}
-        </span>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="font-semibold text-sm truncate">
+            {otherUser?.name ?? "Chat"}
+          </span>
+          {otherUser?.isVerified && <VerifiedBadge size={13} />}
+        </div>
       </div>
 
       {/* Message list */}

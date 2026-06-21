@@ -7,12 +7,14 @@ import {
   EXPERIENCE_LEVELS,
   FITNESS_GOALS,
   GENDERS,
+  LOOKING_FOR,
   MAX_USER_AGE,
   MIN_USER_AGE,
   SCHEDULE_DAYS,
   SCHEDULE_SLOTS,
   joinGenders,
   joinGoals,
+  joinLookingFor,
   joinSchedule,
   publicProfile,
   type ScheduleToken,
@@ -48,6 +50,9 @@ const updateSchema = z
     showMeGenders: z.array(z.enum(GENDERS)).max(GENDERS.length).optional(),
     minAgePref: z.number().int().min(MIN_USER_AGE).max(MAX_USER_AGE).optional().nullable(),
     maxAgePref: z.number().int().min(MIN_USER_AGE).max(MAX_USER_AGE).optional().nullable(),
+    // What kind of partner the user is looking for. Discover ranks by
+    // intersection between viewer and candidate sets.
+    lookingFor: z.array(z.enum(LOOKING_FOR)).max(LOOKING_FOR.length).optional(),
     // Array of `day_slot` tokens. We validate each token client- and server-side
     // by enum-checking both halves so a malformed string can't sneak in.
     gymSchedule: z
@@ -97,6 +102,9 @@ export const PUT = withAuth(async (req, payload) => {
       }),
       ...(data.gymSchedule !== undefined && {
         gymSchedule: joinSchedule(data.gymSchedule as ScheduleToken[]),
+      }),
+      ...(data.lookingFor !== undefined && {
+        lookingFor: joinLookingFor(data.lookingFor),
       }),
     },
     include: { photos: true },

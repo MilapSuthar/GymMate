@@ -18,6 +18,25 @@ export type ExperienceLevel = (typeof EXPERIENCE_LEVELS)[number];
 export const GENDERS = ["male", "female", "non_binary", "other"] as const;
 export type Gender = (typeof GENDERS)[number];
 
+// Canonical "what kind of partner are you looking for" tags. Discover uses
+// these to rank/filter candidates with intersecting intent — a beginner
+// looking for an accountability buddy doesn't want a random heavy lifter,
+// they want someone *also* looking for accountability.
+export const LOOKING_FOR = [
+  "partner",
+  "spotter",
+  "class-buddy",
+  "accountability",
+] as const;
+export type LookingFor = (typeof LOOKING_FOR)[number];
+
+export const LOOKING_FOR_LABELS: Record<LookingFor, string> = {
+  partner: "Training partner",
+  spotter: "Spotter",
+  "class-buddy": "Class buddy",
+  accountability: "Accountability buddy",
+};
+
 /** Inclusive minimum legal age for the app. Backed by an 18+ gate at signup. */
 export const MIN_USER_AGE = 18;
 export const MAX_USER_AGE = 99;
@@ -128,6 +147,22 @@ export function ageFromDob(dob: Date | null | undefined): number | null {
   return years;
 }
 
+export function parseLookingFor(value: string | null | undefined): LookingFor[] {
+  if (!value) return [];
+  const set = new Set<string>(
+    value
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+  );
+  return LOOKING_FOR.filter((t) => set.has(t));
+}
+
+export function joinLookingFor(items: LookingFor[]): string {
+  const valid = new Set<string>(LOOKING_FOR);
+  return Array.from(new Set(items.filter((t) => valid.has(t)))).join(",");
+}
+
 export function parseGoals(value: string | null | undefined): FitnessGoal[] {
   if (!value) return [];
   return value
@@ -200,6 +235,8 @@ export function publicProfile(user: User & { photos: UserPhoto[] }) {
     fitnessGoals: parseGoals(user.fitnessGoals),
     experienceLevel: user.experienceLevel,
     gymSchedule: parseSchedule(user.gymSchedule),
+    lookingFor: parseLookingFor(user.lookingFor),
+    isVerified: user.isVerified,
     photoUrl: user.photoUrl,
     photos: user.photos
       .sort((a, b) => a.position - b.position)
