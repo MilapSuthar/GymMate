@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Pencil,
   Dumbbell,
@@ -10,9 +11,21 @@ import {
   Briefcase,
   ChevronRight,
   LogOut,
+  Download,
+  Trash2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import ProfileSessions from "@/components/profile-sessions";
 import VerifiedBadge from "@/components/verified-badge";
 import { useAuth } from "@/context/AuthContext";
@@ -32,9 +45,69 @@ interface Profile {
 }
 
 export default function ProfilePage() {
+  const router = useRouter();
   const { authFetch, logout, loading } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [fetching, setFetching] = useState(true);
+
+  // Account-management dialog state.
+  const [exporting, setExporting] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const exportData = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const res = await authFetch("/api/account/export");
+      if (!res.ok) throw new Error();
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `gymmate-${profile?.id ?? "export"}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      const { toast } = await import("sonner");
+      toast.success("Your data is downloading");
+    } catch {
+      const { toast } = await import("sonner");
+      toast.error("Couldn't export your data — try again");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const submitDelete = async () => {
+    if (deleting || deleteConfirm !== "DELETE") return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await authFetch("/api/account/delete", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          password: deletePassword || undefined,
+          confirm: "DELETE",
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setDeleteError(data?.error || "Couldn't delete your account");
+        return;
+      }
+      router.replace("/login");
+    } catch {
+      setDeleteError("Network error — try again");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   useEffect(() => {
     if (loading) return;
@@ -230,17 +303,152 @@ export default function ProfilePage() {
         </Link>
       </section>
 
+      {/* Account management — GDPR/CCPA "right to access" + "right to
+          erasure." Export streams a JSON dump; delete is gated by password
+          (for credentials accounts) and a typed "DELETE" confirmation. */}
       <section className="mt-8 pt-6 border-t border-border">
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+          Account
+        </h3>
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={exportData}
+            disabled={exporting}
+            data-testid="account-export"
+            className="flex items-center gap-3 rounded-xl p-3 border border-border bg-card hover:border-primary/40 transition-colors disabled:opacity-50 text-left"
+          >
+            <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+              {exporting ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Download size={16} />
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold">Export my data</p>
+              <p className="text-xs text-muted-foreground">
+                Download a JSON file with everything on your account
+              </p>
+            </div>
+          </button>
+
+          <button
+            onClick={() => setDeleteOpen(true)}
+            data-testid="account-delete-open"
+            className="flex items-center gap-3 rounded-xl p-3 border border-destructive/30 bg-destructive/5 hover:border-destructive/60 transition-colors text-left"
+          >
+            <div className="w-9 h-9 rounded-lg bg-destructive/15 text-destructive flex items-center justify-center shrink-0">
+              <Trash2 size={16} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-destructive">
+                Delete my account
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Permanently removes your profile, matches, and messages
+              </p>
+            </div>
+          </button>
+        </div>
+
         <Button
           variant="destructive"
           onClick={() => logout()}
           data-testid="profile-logout"
-          className="w-full h-10 gap-2"
+          className="w-full h-10 gap-2 mt-4"
         >
           <LogOut size={16} />
           Log out
         </Button>
       </section>
+
+      {/* Delete confirmation dialog. Requires both a password (for credentials
+          accounts; OAuth-only accounts can leave it blank) AND a typed
+          "DELETE" string to prevent any accidental nuclear button. */}
+      <Dialog
+        open={deleteOpen}
+        onOpenChange={(open) => {
+          if (!open && !deleting) {
+            setDeleteOpen(false);
+            setDeletePassword("");
+            setDeleteConfirm("");
+            setDeleteError(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete your account?</DialogTitle>
+            <DialogDescription>
+              This permanently deletes your profile, photos, matches,
+              messages, meetups, and RSVPs. It cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-3 my-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="delete-password">
+                Password{" "}
+                <span className="text-muted-foreground font-normal">
+                  (skip if you signed up with Google)
+                </span>
+              </Label>
+              <Input
+                id="delete-password"
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                autoComplete="current-password"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="delete-confirm">
+                Type{" "}
+                <span className="font-mono font-semibold text-destructive">
+                  DELETE
+                </span>{" "}
+                to confirm
+              </Label>
+              <Input
+                id="delete-confirm"
+                value={deleteConfirm}
+                onChange={(e) => setDeleteConfirm(e.target.value)}
+                placeholder="DELETE"
+              />
+            </div>
+
+            {deleteError && (
+              <p className="text-xs text-destructive">{deleteError}</p>
+            )}
+          </div>
+
+          <DialogFooter className="flex flex-col gap-2 sm:flex-col">
+            <Button
+              variant="destructive"
+              onClick={submitDelete}
+              disabled={deleting || deleteConfirm !== "DELETE"}
+              data-testid="account-delete-confirm"
+            >
+              {deleting ? (
+                <>
+                  <Loader2 size={14} className="animate-spin mr-1" />
+                  Deleting…
+                </>
+              ) : (
+                "Permanently delete my account"
+              )}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setDeleteOpen(false)}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
