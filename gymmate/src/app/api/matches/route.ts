@@ -6,9 +6,8 @@ import {
   scheduleOverlap,
   parseLookingFor,
   parseGoals,
-  LOOKING_FOR_LABELS,
-  type LookingFor,
 } from "@/lib/profile";
+import { intersect, whyMatched } from "@/lib/match-reason";
 import { haversineKm } from "@/lib/geo";
 
 const OTHER_USER_SELECT = {
@@ -25,50 +24,6 @@ const OTHER_USER_SELECT = {
   fitnessGoals: true,
   isVerified: true,
 };
-
-function intersect<T>(a: T[], b: T[]): T[] {
-  const setB = new Set(b);
-  return a.filter((x) => setB.has(x));
-}
-
-/**
- * Heuristic "why these two matched" line. Picks the single strongest signal
- * we can see and writes it as one short string for the matches list. Order
- * matters: explicit intent (lookingFor) beats inferred signals (overlap), and
- * "same gym" beats raw distance because users care that they'd actually run
- * into each other, not just that they live close.
- */
-function whyMatched(opts: {
-  sharedLookingFor: LookingFor[];
-  sharedGoals: string[];
-  overlap: number;
-  sameGym: boolean;
-  distanceKm: number | null;
-}): string {
-  const { sharedLookingFor, sharedGoals, overlap, sameGym, distanceKm } = opts;
-
-  if (sharedLookingFor.length > 0) {
-    const label =
-      LOOKING_FOR_LABELS[sharedLookingFor[0]] ?? sharedLookingFor[0];
-    return `Both looking for a ${label.toLowerCase()}`;
-  }
-  if (overlap >= 3) {
-    return `${overlap} weekly time slots overlap`;
-  }
-  if (sameGym) {
-    return "Same gym";
-  }
-  if (distanceKm != null && distanceKm < 2) {
-    return `Just ${distanceKm.toFixed(1)} km apart`;
-  }
-  if (overlap >= 1) {
-    return `${overlap} weekly time slot overlap`;
-  }
-  if (sharedGoals.length > 0) {
-    return `Both into ${sharedGoals[0].replace("-", " ")}`;
-  }
-  return "Recent mutual like";
-}
 
 /**
  * GET /api/matches — all matches for the current user, enriched with the

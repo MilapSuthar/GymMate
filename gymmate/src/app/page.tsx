@@ -45,6 +45,8 @@ interface DiscoverUser {
   /** Shared (day, slot) cells with the viewer. 0 = no overlap or no schedule. */
   overlap: number;
   isVerified: boolean;
+  /** Pre-computed "why this is a fit" headline — strongest single signal. */
+  whyMatched: string;
 }
 
 interface MatchedUser {
@@ -766,6 +768,15 @@ function ProfileCard({
               <Clock size={11} />
               {user.overlap}× /wk overlap
             </div>
+          )}
+          {/* Why-matched headline — the same single-line reasoning that the
+              matches list shows, but surfaced during the swipe so users see
+              *why* before they decide, not just after. */}
+          {user.whyMatched && (
+            <p className="text-xs text-emerald-300 mt-1.5 flex items-center gap-1">
+              <Sparkles size={11} className="shrink-0" />
+              <span className="truncate">{user.whyMatched}</span>
+            </p>
           )}
           {user.experienceLevel && (
             <p className="text-xs text-white/60 mt-1 capitalize">

@@ -7,6 +7,7 @@ import {
   parseLookingFor,
   scheduleOverlap,
 } from "@/lib/profile";
+import { intersect, whyMatched } from "@/lib/match-reason";
 import { haversineKm } from "@/lib/geo";
 
 const DEFAULT_LIMIT = 20;
@@ -100,6 +101,9 @@ export const GET = withAuth(async (req, payload) => {
         dateOfBirth: true,
         age: true,
         gymSchedule: true,
+        gymName: true,
+        lookingFor: true,
+        fitnessGoals: true,
       },
     }),
     prisma.swipe.findMany({
@@ -238,6 +242,23 @@ export const GET = withAuth(async (req, payload) => {
         lookingFor: parseLookingFor(u.lookingFor),
         experienceLevel: u.experienceLevel,
         isVerified: u.isVerified,
+        whyMatched: whyMatched({
+          sharedLookingFor: intersect(
+            parseLookingFor(viewer?.lookingFor),
+            parseLookingFor(u.lookingFor)
+          ),
+          sharedGoals: intersect(
+            parseGoals(viewer?.fitnessGoals),
+            parseGoals(u.fitnessGoals)
+          ),
+          overlap,
+          sameGym:
+            !!viewer?.gymName &&
+            viewer.gymName.trim().toLowerCase() ===
+              (u.gymName ?? "").trim().toLowerCase() &&
+            viewer.gymName.trim().length > 0,
+          distanceKm: distance,
+        }),
         photoUrl: photoUrls[0] ?? null, // back-compat for older clients
         photos: photoUrls,
         distance: distance != null ? Math.round(distance * 10) / 10 : null,
