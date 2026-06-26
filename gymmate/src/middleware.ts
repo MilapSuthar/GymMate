@@ -26,7 +26,10 @@ const PROTECTED_PATHS = [
   "/trainer",
   "/booking",
 ];
-const AUTH_PATHS = ["/login", "/register"];
+// Routes that should bounce *logged-in* users away (so they don't sit on
+// the marketing landing or the login form when they already have a session).
+// /welcome is the public marketing surface; login and register are auth forms.
+const AUTH_PATHS = ["/login", "/register", "/welcome"];
 const REFRESH_COOKIE = "gm_refresh";
 
 function isProtected(pathname: string) {
@@ -40,8 +43,16 @@ export function middleware(req: NextRequest) {
 
   if (isProtected(pathname) && !hasSession) {
     const url = req.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("next", pathname);
+    // Anonymous visitors hitting `/` land on the marketing page instead of
+    // being dumped straight on a login form (the single biggest top-of-funnel
+    // drop-off pattern in a swipe-style product). Every other protected
+    // surface still routes to /login with a ?next= return path.
+    if (pathname === "/") {
+      url.pathname = "/welcome";
+    } else {
+      url.pathname = "/login";
+      url.searchParams.set("next", pathname);
+    }
     return NextResponse.redirect(url);
   }
 
