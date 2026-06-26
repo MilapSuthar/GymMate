@@ -172,11 +172,14 @@ export default function WelcomePage() {
             <span>Made for lifters, by lifters.</span>
           </div>
           <div className="flex items-center gap-5 text-xs text-muted-foreground">
+            <Link href="/privacy" className="hover:text-foreground transition-colors">
+              Privacy
+            </Link>
+            <Link href="/terms" className="hover:text-foreground transition-colors">
+              Terms
+            </Link>
             <Link href="/login" className="hover:text-foreground transition-colors">
               Log in
-            </Link>
-            <Link href="/register" className="hover:text-foreground transition-colors">
-              Sign up
             </Link>
             <span className="opacity-50">
               &copy; {new Date().getFullYear()} GymMate
