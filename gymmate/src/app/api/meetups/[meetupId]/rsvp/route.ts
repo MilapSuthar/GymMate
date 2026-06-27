@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { withAuth } from "@/lib/auth";
 import { parseJson } from "@/lib/validation";
+import { sendNotification } from "@/lib/notifications";
 
 const rsvpSchema = z.object({
   going: z.boolean(),
@@ -83,11 +84,33 @@ export const POST = withAuth<{ params: Promise<{ meetupId: string }> }>(
     }
 
     const status = going ? "going" : "cancelled";
+    const prior = await prisma.meetupRsvp.findUnique({
+      where: { meetupId_userId: { meetupId, userId: me } },
+      select: { status: true },
+    });
     const rsvp = await prisma.meetupRsvp.upsert({
       where: { meetupId_userId: { meetupId, userId: me } },
       create: { meetupId, userId: me, status },
       update: { status },
     });
+
+    // Notify the host on a real *new* join — i.e. status going and the user
+    // either had no row before or was previously cancelled. Skip silent
+    // re-confirms (going → going) and don't notify on cancellations.
+    if (going && prior?.status !== "going") {
+      const joiner = await prisma.user.findUnique({
+        where: { id: me },
+        select: { name: true, displayName: true },
+      });
+      const joinerName = joiner?.displayName || joiner?.name || "Someone";
+      await sendNotification({
+        userId: meetup.hostId,
+        type: "new_rsvp",
+        title: "New RSVP for your meetup",
+        body: `${joinerName} is going to ${meetup.title}.`,
+        data: { meetupId, joinerId: me },
+      });
+    }
 
     return NextResponse.json({
       rsvp: { id: rsvp.id, status: rsvp.status },

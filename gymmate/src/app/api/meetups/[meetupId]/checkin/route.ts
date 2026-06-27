@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { withAuth } from "@/lib/auth";
+import { sendNotification } from "@/lib/notifications";
 
 /**
  * POST /api/meetups/[meetupId]/checkin — mark the viewer as having shown up.
@@ -57,6 +58,28 @@ export const POST = withAuth<{ params: Promise<{ meetupId: string }> }>(
       where: { id: rsvp.id },
       data: { checkedIn: true },
     });
+
+    // Notify the host when an *attendee* checks in (not the host's own
+    // self-check-in). Drives the host's sense of "the session really
+    // happened" which is what makes the weekly co-attendance stat real.
+    if (meetup.hostId !== me) {
+      const attendee = await prisma.user.findUnique({
+        where: { id: me },
+        select: { name: true, displayName: true },
+      });
+      const attendeeName =
+        attendee?.displayName || attendee?.name || "Someone";
+      const meetupTitle = await prisma.meetup
+        .findUnique({ where: { id: meetupId }, select: { title: true } })
+        .then((m) => m?.title ?? "your meetup");
+      await sendNotification({
+        userId: meetup.hostId,
+        type: "new_checkin",
+        title: "Someone checked in to your meetup",
+        body: `${attendeeName} confirmed they showed up to ${meetupTitle}.`,
+        data: { meetupId, attendeeId: me },
+      });
+    }
 
     return NextResponse.json({ checkedIn: true });
   },
